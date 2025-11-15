@@ -113,7 +113,7 @@ export function getDayFileName(settings: WeekPlannerPluginSettings, date: Date) 
 	return settings.baseDir + '/' + settings.daysDir + '/' + dateString(moment(date)) + "-" + getWeekday(date) + '.md'
 }
 
-export function getDateFromFilename(filename: String): moment.Moment {
+export function getDateFromFilename(filename: string): moment.Moment {
 	if (filename == undefined || filename == '') {
 		return moment()
 	}
@@ -132,7 +132,7 @@ export function getWeekFileName(settings: WeekPlannerPluginSettings, m: moment.M
 }
 
 export function getNextWorkingDay(workingDays: string) {
-	let today = new Date()
+	const today = new Date()
 	while (!isWorkingDay(today, workingDays)) {
 		today.setDate(today.getDate() + 1);
 	}
@@ -140,7 +140,7 @@ export function getNextWorkingDay(workingDays: string) {
 }
 
 export function getTomorrowDate(workingDays: string, date?: moment.Moment) {
-	let today = date !== undefined ? date : moment()
+	const today = date !== undefined ? date : moment()
 	let tomorrow = today.add(1, 'days');
 	while (!isWorkingDay(tomorrow.toDate(), workingDays)) {
 		tomorrow = moment(tomorrow).add(1, 'days');

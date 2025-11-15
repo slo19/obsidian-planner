@@ -45,6 +45,8 @@ them as seamless as possible. These goals are achieved by providing a set of com
 - `Move to Inbox` Moves task under cursor back to the inbox
 - `Move Anywhere` Opens a modal to move task under cursor to the inbox or a specific date document
 - `Add Todo` Opens a todo modal to create a new todo and insert it into the inbox or a specific date document
+- `Update Progress Counter` Updates the progress counter (completed/total checkboxes) in the current file
+- `Update All Progress Counters` Updates the progress counters in all Week Planner files
 
 All `Show`-Tasks open the relevant document. The document and the underlying folder structure is
 created automatically if it doesn't exist.
@@ -71,6 +73,33 @@ tomorrow. The *tomorrow* file will also be created automatically if it doesn't e
 And finally, if your current document is *yesterday* `Move Task` moves the task to *today*. This
 command is helpful when you didn't finish some of yesterday's tasks and forgot to move them to the
 next day on the day before.
+
+## Progress Tracking
+
+The plugin automatically tracks your progress on tasks. Each file created by the plugin includes a
+progress counter that shows:
+
+- Number of completed tasks (checked checkboxes)
+- Total number of tasks
+- Completion percentage
+
+Example:
+```
+## Inbox
+**Progress:** 3/5 (60%)
+
+- [x] Completed task 1
+- [x] Completed task 2
+- [ ] Pending task 3
+- [x] Completed task 3
+- [ ] Pending task 4
+```
+
+You can update the progress counter manually using:
+- `Update Progress Counter` - Updates only the current file
+- `Update All Progress Counters` - Updates all files in your Week Planner directory
+
+The progress counter is automatically added when new files are created.
 
 ## Settings
 

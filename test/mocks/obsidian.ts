@@ -1,5 +1,13 @@
 import { Workspace, Vault, MetadataCache, FileManager, UserEvent } from "obsidian";
 
+// Mock localStorage to avoid errors in tests
+if (typeof global !== 'undefined') {
+	Object.defineProperty(global, 'localStorage', {
+		value: undefined,
+		writable: true
+	});
+}
+
 export class App {
 
 	/** @public */
