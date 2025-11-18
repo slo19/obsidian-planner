@@ -626,31 +626,37 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 				const taskText = task.replace(TODO_PREFIX, '').replace(TODO_DONE_PREFIX, '').trim();
 				
 				// Valid patterns:
-				// 1. "task name - #morning/#afternoon/#night - #day" (with shift and specific day)
+				// 1. "task name - #morning/#afternoon/#night - #days" (with shift and multiple/single days)
 				// 2. "task name - #morning/#afternoon/#night" (with shift for all working days)
-				// 3. "task name - #day" (specific day without shift)
+				// 3. "task name - #days" (multiple/single days without shift)
 				// 4. "task name" (all working days without shift)
 				
-				const shiftDayMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#(\d)$/i);
+				// Pattern for shift + days: supports single (#1), multiple (#1,3,5), or ranges (#2-5)
+				const shiftDayMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#([\d,\-]+)$/i);
 				const shiftOnlyMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)$/i);
-				const dayOnlyMatch = taskText.match(/^(.+?)\s-\s#(\d)$/);
+				const dayOnlyMatch = taskText.match(/^(.+?)\s-\s#([\d,\-]+)$/);
 				const noPatternMatch = !taskText.includes(' - ');
 				
 				if (shiftDayMatch) {
-					// Task with shift and specific day: "caminhar - morning - 1"
+					// Task with shift and specific days: "caminhar - #morning - #1,3,5"
 					const taskName = shiftDayMatch[1].trim();
 					const shift = shiftDayMatch[2].toLowerCase();
-					const dayNum = parseInt(shiftDayMatch[3]);
+					const daysStr = shiftDayMatch[3];
+					const days = this.parseDays(daysStr);
 					
-					if (dayNum >= 1 && dayNum <= 7) {
-						const dayDate = this.getDayOfWeek(weekMoment, dayNum);
-						await this.addTaskToDay(dayDate, taskName, weekFileName, shift);
+					if (days.length > 0) {
+						for (const dayNum of days) {
+							if (dayNum >= 1 && dayNum <= 7) {
+								const dayDate = this.getDayOfWeek(weekMoment, dayNum);
+								await this.addTaskToDay(dayDate, taskName, weekFileName, shift);
+							}
+						}
 						processed++;
 					} else {
-						ignored.push(`"${taskText}" - invalid day number (must be 1-7)`);
+						ignored.push(`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`);
 					}
 				} else if (shiftOnlyMatch) {
-					// Task with shift for all working days: "exercícios - morning"
+					// Task with shift for all working days: "exercícios - #morning"
 					const taskName = shiftOnlyMatch[1].trim();
 					const shift = shiftOnlyMatch[2].toLowerCase();
 					
@@ -662,16 +668,21 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					}
 					processed++;
 				} else if (dayOnlyMatch) {
-					// Task for specific day without shift: "pagar conta - 1"
+					// Task for specific days without shift: "pagar conta - #1,3,5"
 					const taskName = dayOnlyMatch[1].trim();
-					const dayNum = parseInt(dayOnlyMatch[2]);
+					const daysStr = dayOnlyMatch[2];
+					const days = this.parseDays(daysStr);
 					
-					if (dayNum >= 1 && dayNum <= 7) {
-						const dayDate = this.getDayOfWeek(weekMoment, dayNum);
-						await this.addTaskToDay(dayDate, taskName, weekFileName);
+					if (days.length > 0) {
+						for (const dayNum of days) {
+							if (dayNum >= 1 && dayNum <= 7) {
+								const dayDate = this.getDayOfWeek(weekMoment, dayNum);
+								await this.addTaskToDay(dayDate, taskName, weekFileName);
+							}
+						}
 						processed++;
 					} else {
-						ignored.push(`"${taskText}" - invalid day number (must be 1-7)`);
+						ignored.push(`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`);
 					}
 				} else if (noPatternMatch) {
 					// Task for all working days without shift: "fazer relatório"
@@ -684,12 +695,46 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					processed++;
 				} else {
 					// Invalid syntax - has " - " but doesn't match any pattern
-					ignored.push(`"${taskText}" - invalid syntax. Use: "task - #shift - #day", "task - #shift", "task - #day", or "task"`);
+					ignored.push(`"${taskText}" - invalid syntax. Use: "task - #shift - #days", "task - #shift", "task - #days", or "task"`);
 				}
 			}
 		}
 		
 		return {processed, ignored};
+	}
+
+	parseDays(daysStr: string): number[] {
+		const days: Set<number> = new Set();
+		
+		// Split by comma for multiple entries
+		const parts = daysStr.split(',');
+		
+		for (const part of parts) {
+			const trimmed = part.trim();
+			
+			// Check if it's a range (e.g., "2-5")
+			if (trimmed.includes('-')) {
+				const rangeParts = trimmed.split('-');
+				if (rangeParts.length === 2) {
+					const start = parseInt(rangeParts[0].trim());
+					const end = parseInt(rangeParts[1].trim());
+					
+					if (!isNaN(start) && !isNaN(end) && start >= 1 && end <= 7 && start <= end) {
+						for (let i = start; i <= end; i++) {
+							days.add(i);
+						}
+					}
+				}
+			} else {
+				// Single day number
+				const dayNum = parseInt(trimmed);
+				if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 7) {
+					days.add(dayNum);
+				}
+			}
+		}
+		
+		return Array.from(days).sort((a, b) => a - b);
 	}
 
 	async updateWeeklySummary() {
