@@ -1,4 +1,12 @@
-import {App, Editor, Plugin, PluginSettingTab, Setting, moment, Notice} from 'obsidian';
+import {
+	App,
+	Editor,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	moment,
+	Notice,
+} from "obsidian";
 import WeekPlannerFile, {
 	extendFileName,
 	getInboxFileName,
@@ -7,12 +15,13 @@ import WeekPlannerFile, {
 	getTomorrowDate,
 	getYesterdayDate,
 	getNextWorkingDay,
-	isValidWorkingDaysString, getDateFromFilename
+	isValidWorkingDaysString,
+	getDateFromFilename,
 } from "./src/file";
-import {TODO_DONE_PREFIX, TODO_PREFIX} from "./src/constants";
-import {getCalendarWeek} from "./src/date";
-import {TodoModal} from "./src/todo-modal";
-import {DEFAULT_SETTINGS, WeekPlannerPluginSettings} from "./src/settings";
+import { TODO_DONE_PREFIX, TODO_PREFIX } from "./src/constants";
+import { getCalendarWeek } from "./src/date";
+import { TodoModal } from "./src/todo-modal";
+import { DEFAULT_SETTINGS, WeekPlannerPluginSettings } from "./src/settings";
 
 // noinspection JSUnusedGlobalSymbols
 export default class WeekPlannerPlugin extends Plugin {
@@ -25,261 +34,422 @@ export default class WeekPlannerPlugin extends Plugin {
 			id: "add-todo",
 			name: "Add Todo",
 			callback: () => {
-				new TodoModal(this.app, 'Create Task', 'Create', '', (task: string, list: string, date: Date) => {
-					if (list == 'inbox') {
-						this.insertIntoInbox(TODO_PREFIX + task)
-					} else if (list == 'tomorrow') {
-						this.insertIntoTomorrow(TODO_PREFIX + task)
-					} else if (list == 'target-date') {
-						this.insertIntoTargetDate(date, TODO_PREFIX + task)
+				new TodoModal(
+					this.app,
+					"Create Task",
+					"Create",
+					"",
+					(task: string, list: string, date: Date) => {
+						if (list == "inbox") {
+							this.insertIntoInbox(TODO_PREFIX + task);
+						} else if (list == "tomorrow") {
+							this.insertIntoTomorrow(TODO_PREFIX + task);
+						} else if (list == "target-date") {
+							this.insertIntoTargetDate(date, TODO_PREFIX + task);
+						}
 					}
-				}).open();
+				).open();
 			},
 		});
 
 		this.addCommand({
-			id: 'week-planner-inbox',
-			name: 'Show Inbox',
+			id: "week-planner-inbox",
+			name: "Show Inbox",
 			callback: () => this.createInbox(),
-			hotkeys: []
+			hotkeys: [],
 		});
 
 		this.addCommand({
-			id: 'week-planner-week',
-			name: 'Show Week',
+			id: "week-planner-week",
+			name: "Show Week",
 			callback: () => this.createWeek(),
-			hotkeys: []
+			hotkeys: [],
 		});
 
 		this.addCommand({
-			id: 'week-planner-today',
-			name: 'Show Today',
+			id: "week-planner-today",
+			name: "Show Today",
 			callback: () => this.createToday(),
-			hotkeys: []
+			hotkeys: [],
 		});
 
 		this.addCommand({
-			id: 'week-planner-yesterday',
-			name: 'Show Yesterday',
+			id: "week-planner-yesterday",
+			name: "Show Yesterday",
 			callback: () => this.createYesterday(),
-			hotkeys: []
+			hotkeys: [],
 		});
 
 		this.addCommand({
-			id: 'week-planner-tomorrow',
-			name: 'Show Tomorrow',
+			id: "week-planner-tomorrow",
+			name: "Show Tomorrow",
 			callback: () => this.createTomorrow(),
-			hotkeys: []
+			hotkeys: [],
 		});
 
 		this.addCommand({
-			id: 'move-task',
-			name: 'Move Task',
+			id: "move-task",
+			name: "Move Task",
 			editorCallback: (editor: Editor) => {
-				this.moveTask(editor)
-			}
+				this.moveTask(editor);
+			},
 		});
 
 		this.addCommand({
-			id: 'move-to-inbox',
-			name: 'Move to Inbox',
+			id: "move-to-inbox",
+			name: "Move to Inbox",
 			editorCallback: (editor: Editor) => {
-				this.moveTaskToInbox(editor)
-			}
+				this.moveTaskToInbox(editor);
+			},
 		});
 
 		this.addCommand({
-			id: 'move-anywhere',
-			name: 'Move anywhere',
+			id: "move-anywhere",
+			name: "Move anywhere",
 			editorCallback: (editor: Editor) => {
-				this.moveAnywhere(editor)
-			}
-		})
+				this.moveAnywhere(editor);
+			},
+		});
 
 		this.addCommand({
-			id: 'sync-week-to-days',
-			name: 'Sync Week Tasks to Days',
+			id: "sync-week-to-days",
+			name: "Sync Week Tasks to Days",
 			callback: async () => {
 				await this.syncWeekToDays();
-			}
+			},
 		});
 
 		this.addCommand({
-			id: 'update-weekly-summary',
-			name: 'Update Weekly Summary',
+			id: "update-weekly-summary",
+			name: "Update Weekly Summary",
 			callback: async () => {
 				await this.updateWeeklySummary();
-			}
+			},
 		});
 
 		this.addSettingTab(new WeekPlannerSettingTab(this.app, this));
 	}
 
 	async insertIntoTargetDate(date: Date, todo: string) {
-		let today = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, date));
-		await today.createIfNotExists(this.app.vault, this.app.workspace, 'Inbox')
-		await today.insertAt(todo, 1)
+		let today = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getDayFileName(this.settings, date)
+		);
+		await today.createIfNotExists(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
+		await today.insertAt(todo, 1);
 	}
 
 	async insertIntoInbox(todo: string) {
-		let inbox = new WeekPlannerFile(this.settings, this.app.vault, getInboxFileName(this.settings));
-		await inbox.createIfNotExists(this.app.vault, this.app.workspace, 'Inbox')
-		await inbox.insertAt(todo, 1)
+		let inbox = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getInboxFileName(this.settings)
+		);
+		await inbox.createIfNotExists(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
+		await inbox.insertAt(todo, 1);
 	}
 
 	async insertIntoTomorrow(todo: string) {
-		let tomorrow = getTomorrowDate(this.settings.workingDays)
-		let dest = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, tomorrow));
-		await dest.createIfNotExists(this.app.vault, this.app.workspace, 'Inbox')
-		await dest.insertAt(todo, 1)
+		let tomorrow = getTomorrowDate(this.settings.workingDays);
+		let dest = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getDayFileName(this.settings, tomorrow)
+		);
+		await dest.createIfNotExists(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
+		await dest.insertAt(todo, 1);
 	}
 
 	async createInbox() {
-		let file = new WeekPlannerFile(this.settings, this.app.vault, getInboxFileName(this.settings));
-		await file.createIfNotExistsAndOpen(this.app.vault, this.app.workspace, 'Inbox')
+		let file = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getInboxFileName(this.settings)
+		);
+		await file.createIfNotExistsAndOpen(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
 	}
 
 	async createWeek() {
-		const m = moment()
-		let weekFile = new WeekPlannerFile(this.settings, this.app.vault, getWeekFileName(this.settings, m));
-		await weekFile.createIfNotExistsAndOpen(this.app.vault, this.app.workspace, 'Goals of Week ' + getCalendarWeek(m))
+		const m = moment();
+		let weekFile = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getWeekFileName(this.settings, m)
+		);
+		await weekFile.createIfNotExistsAndOpen(
+			this.app.vault,
+			this.app.workspace,
+			"Goals of Week " + getCalendarWeek(m)
+		);
 	}
 
 	async createToday() {
-		let date = new Date()
-		let file = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, date));
-		await file.createIfNotExistsAndOpen(this.app.vault, this.app.workspace, 'Inbox')
+		let date = new Date();
+		let file = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getDayFileName(this.settings, date)
+		);
+		await file.createIfNotExistsAndOpen(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
 	}
 
 	async createTomorrow() {
-		let date = getTomorrowDate(this.settings.workingDays)
-		let file = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, date));
-		await file.createIfNotExistsAndOpen(this.app.vault, this.app.workspace, 'Inbox')
+		let date = getTomorrowDate(this.settings.workingDays);
+		let file = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getDayFileName(this.settings, date)
+		);
+		await file.createIfNotExistsAndOpen(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
 	}
 
 	async createYesterday() {
-		let date = getYesterdayDate()
-		let file = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, date));
-		await file.createIfNotExistsAndOpen(this.app.vault, this.app.workspace, 'Inbox')
+		let date = getYesterdayDate();
+		let file = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getDayFileName(this.settings, date)
+		);
+		await file.createIfNotExistsAndOpen(
+			this.app.vault,
+			this.app.workspace,
+			"Inbox"
+		);
 	}
 
 	async moveTask(editor: Editor) {
-		let sourceFileName = extendFileName(this.settings, this.app.workspace.getActiveFile()?.name)
-		let source = new WeekPlannerFile(this.settings, this.app.vault, sourceFileName);
+		let sourceFileName = extendFileName(
+			this.settings,
+			this.app.workspace.getActiveFile()?.name
+		);
+		let source = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			sourceFileName
+		);
 
-		let destFileName: string
+		let destFileName: string;
 		if (source.isInbox() || source.isYesterday()) {
 			// Inbox and yesterday's todos are move to today
-			destFileName = getDayFileName(this.settings, getNextWorkingDay(this.settings.workingDays))
+			destFileName = getDayFileName(
+				this.settings,
+				getNextWorkingDay(this.settings.workingDays)
+			);
 		} else {
 			// All other todos are move to the next working day following the day represented by the current file
 			let dateFromFilename = getDateFromFilename(source.fullFileName);
-			destFileName = getDayFileName(this.settings, getTomorrowDate(this.settings.workingDays, dateFromFilename))
+			destFileName = getDayFileName(
+				this.settings,
+				getTomorrowDate(this.settings.workingDays, dateFromFilename)
+			);
 		}
 
 		// Consider to move files from the past also to today
 
-		let dest = new WeekPlannerFile(this.settings, this.app.vault, destFileName);
-		await this.move(editor, source, dest, 'Inbox')
+		let dest = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			destFileName
+		);
+		await this.move(editor, source, dest, "Inbox");
 	}
 
-	async move(editor: Editor, source: WeekPlannerFile, dest: WeekPlannerFile, header: string) {
-		await dest.createIfNotExists(this.app.vault, this.app.workspace, header)
-		const line = editor.getCursor().line
-		let todo = editor.getLine(line)
+	async move(
+		editor: Editor,
+		source: WeekPlannerFile,
+		dest: WeekPlannerFile,
+		header: string
+	) {
+		await dest.createIfNotExists(
+			this.app.vault,
+			this.app.workspace,
+			header
+		);
+		const line = editor.getCursor().line;
+		let todo = editor.getLine(line);
 		if (todo.startsWith(TODO_PREFIX) || todo.startsWith(TODO_DONE_PREFIX)) {
-			await dest.insertAt(todo, 1)
-			await source.deleteLine(line, todo, editor)
+			await dest.insertAt(todo, 1);
+			await source.deleteLine(line, todo, editor);
 		}
 	}
 
 	async moveTaskToInbox(editor: Editor) {
-		let sourceFileName = extendFileName(this.settings, this.app.workspace.getActiveFile()?.name)
-		let source = new WeekPlannerFile(this.settings, this.app.vault, sourceFileName);
-		let dest = new WeekPlannerFile(this.settings, this.app.vault, getInboxFileName(this.settings));
-		await this.move(editor, source, dest, 'Inbox')
+		let sourceFileName = extendFileName(
+			this.settings,
+			this.app.workspace.getActiveFile()?.name
+		);
+		let source = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			sourceFileName
+		);
+		let dest = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			getInboxFileName(this.settings)
+		);
+		await this.move(editor, source, dest, "Inbox");
 	}
 
 	async moveAnywhere(editor: Editor) {
-		const line = editor.getCursor().line
-		let todo = editor.getLine(line)
+		const line = editor.getCursor().line;
+		let todo = editor.getLine(line);
 		if (todo.startsWith(TODO_PREFIX) || todo.startsWith(TODO_DONE_PREFIX)) {
-			todo = todo.substring(TODO_PREFIX.length, todo.length)
-			new TodoModal(this.app, 'Move Task', 'Move', todo, (task: string, list: string, date: Date) => {
-				const sourceFileName = extendFileName(this.settings, this.app.workspace.getActiveFile()?.name)
-				const source = new WeekPlannerFile(this.settings, this.app.vault, sourceFileName);
+			todo = todo.substring(TODO_PREFIX.length, todo.length);
+			new TodoModal(
+				this.app,
+				"Move Task",
+				"Move",
+				todo,
+				(task: string, list: string, date: Date) => {
+					const sourceFileName = extendFileName(
+						this.settings,
+						this.app.workspace.getActiveFile()?.name
+					);
+					const source = new WeekPlannerFile(
+						this.settings,
+						this.app.vault,
+						sourceFileName
+					);
 
-				if (list == 'inbox') {
-					this.moveTaskToInbox(editor)
-				} else if (list == 'tomorrow') {
-					const tomorrow = getTomorrowDate(this.settings.workingDays)
-					const dest = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, tomorrow));
-					this.move(editor, source, dest, 'Inbox')
-				} else if (list == 'target-date') {
-					const dest = new WeekPlannerFile(this.settings, this.app.vault, getDayFileName(this.settings, date));
-					this.move(editor, source, dest, 'Inbox')
+					if (list == "inbox") {
+						this.moveTaskToInbox(editor);
+					} else if (list == "tomorrow") {
+						const tomorrow = getTomorrowDate(
+							this.settings.workingDays
+						);
+						const dest = new WeekPlannerFile(
+							this.settings,
+							this.app.vault,
+							getDayFileName(this.settings, tomorrow)
+						);
+						this.move(editor, source, dest, "Inbox");
+					} else if (list == "target-date") {
+						const dest = new WeekPlannerFile(
+							this.settings,
+							this.app.vault,
+							getDayFileName(this.settings, date)
+						);
+						this.move(editor, source, dest, "Inbox");
+					}
 				}
-			}).open();
+			).open();
 		}
 	}
 
 	async syncWeekToDays() {
 		const m = moment();
 		const weekFileName = getWeekFileName(this.settings, m);
-		
+
 		try {
 			const weekContent = await this.app.vault.adapter.read(weekFileName);
-			
+
 			// First, remove tasks from days that are no longer in week
 			await this.removeDeletedTasksFromDays(weekContent, m, weekFileName);
-			
+
 			// Then process and add/update tasks
 			const result = await this.processWeekTasks(weekContent, m);
-			
+
 			// Update week file with progress
 			await this.updateWeekProgress(m);
-			
+
 			// Show summary notification
 			if (result.ignored.length > 0) {
-				new Notice(`⚠️ ${result.ignored.length} task(s) ignored due to invalid syntax:\n${result.ignored.join('\n')}`, 8000);
+				new Notice(
+					`⚠️ ${
+						result.ignored.length
+					} task(s) ignored due to invalid syntax:\n${result.ignored.join(
+						"\n"
+					)}`,
+					8000
+				);
 			}
 			if (result.processed > 0) {
-				new Notice(`✅ Processed ${result.processed} task(s) successfully`);
+				new Notice(
+					`✅ Processed ${result.processed} task(s) successfully`
+				);
 			}
 		} catch (error) {
-			console.error('Error syncing week to days:', error);
-			new Notice('❌ Error syncing week to days. Check console for details.');
+			console.error("Error syncing week to days:", error);
+			new Notice(
+				"❌ Error syncing week to days. Check console for details."
+			);
 		}
 	}
 
-	async removeDeletedTasksFromDays(weekContent: string, weekMoment: moment.Moment, weekFileName: string) {
+	async removeDeletedTasksFromDays(
+		weekContent: string,
+		weekMoment: moment.Moment,
+		weekFileName: string
+	) {
 		// Extract all tasks from week file
 		const weekTasks = new Set<string>();
-		const lines = weekContent.split('\n');
-		
+		const lines = weekContent.split("\n");
+
 		for (const line of lines) {
-			if (line.trim().startsWith(TODO_PREFIX) || line.trim().startsWith(TODO_DONE_PREFIX)) {
-				const taskText = line.trim().replace(TODO_PREFIX, '').replace(TODO_DONE_PREFIX, '').trim();
+			if (
+				line.trim().startsWith(TODO_PREFIX) ||
+				line.trim().startsWith(TODO_DONE_PREFIX)
+			) {
+				const taskText = line
+					.trim()
+					.replace(TODO_PREFIX, "")
+					.replace(TODO_DONE_PREFIX, "")
+					.trim();
 				const taskName = this.extractTaskName(taskText);
 				if (taskName) {
 					weekTasks.add(taskName);
 				}
 			}
 		}
-		
+
 		// Check each day file and remove tasks not in week
 		for (let i = 1; i <= 7; i++) {
 			const dayDate = this.getDayOfWeek(weekMoment, i);
 			const dayFileName = getDayFileName(this.settings, dayDate);
-			
+
 			try {
-				const dayContent = await this.app.vault.adapter.read(dayFileName);
-				const dayLines = dayContent.split('\n');
+				const dayContent = await this.app.vault.adapter.read(
+					dayFileName
+				);
+				const dayLines = dayContent.split("\n");
 				const newLines: string[] = [];
-				
+
 				for (const line of dayLines) {
-					if (line.trim().startsWith(TODO_PREFIX) || line.trim().startsWith(TODO_DONE_PREFIX)) {
-						const taskText = line.trim().replace(TODO_PREFIX, '').replace(TODO_DONE_PREFIX, '').trim();
+					if (
+						line.trim().startsWith(TODO_PREFIX) ||
+						line.trim().startsWith(TODO_DONE_PREFIX)
+					) {
+						const taskText = line
+							.trim()
+							.replace(TODO_PREFIX, "")
+							.replace(TODO_DONE_PREFIX, "")
+							.trim();
 						// Keep task if it's in the week file
 						if (weekTasks.has(taskText)) {
 							newLines.push(line);
@@ -289,8 +459,11 @@ export default class WeekPlannerPlugin extends Plugin {
 						newLines.push(line);
 					}
 				}
-				
-				await this.app.vault.adapter.write(dayFileName, newLines.join('\n'));
+
+				await this.app.vault.adapter.write(
+					dayFileName,
+					newLines.join("\n")
+				);
 			} catch (error) {
 				// Day file doesn't exist, skip
 			}
@@ -299,117 +472,187 @@ export default class WeekPlannerPlugin extends Plugin {
 
 	extractTaskName(taskText: string): string | null {
 		// Extract task name from various formats
-		const shiftDayMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#(\d)$/i);
-		const shiftOnlyMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)$/i);
-		const dayOnlyMatch = taskText.match(/^(.+?)\s-\s#(\d)$/);
-		
+		const maskMatch = taskText.match(
+			/^\[([xX-]{7})\]\s-\s(.+?)(?:\s-\s#(morning|afternoon|night))?$/i
+		);
+		const shiftDayMatch = taskText.match(
+			/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#([\d,\-]+)$/i
+		);
+		const shiftOnlyMatch = taskText.match(
+			/^(.+?)\s-\s#(morning|afternoon|night)$/i
+		);
+		const dayOnlyMatch = taskText.match(/^(.+?)\s-\s#([\d,\-]+)$/);
+
+		if (maskMatch) return maskMatch[2].trim();
+
 		if (shiftDayMatch) return shiftDayMatch[1].trim();
 		if (shiftOnlyMatch) return shiftOnlyMatch[1].trim();
 		if (dayOnlyMatch) return dayOnlyMatch[1].trim();
-		if (!taskText.includes(' - ')) return taskText;
-		
+		if (!taskText.includes(" - ")) return taskText;
+
 		return null;
 	}
 
 	generateProgressBar(percentage: number, width: number = 20): string {
-		const barWidth = Math.min(percentage, 100); // Ensure max is 100%
-		
-		// Color gradient based on percentage
-		let barColor = '#ef4444'; // red for low
-		if (percentage >= 80) {
-			barColor = '#22c55e'; // green for high
-		} else if (percentage >= 50) {
-			barColor = '#eab308'; // yellow for medium
-		}
-		
+		const barWidth = Math.min(percentage, 100);
+		const ratio = isFinite(percentage) ? Math.max(0, percentage) / 100 : 0;
+		const colorInfo = this.getCommitmentColor(ratio);
+		const barColor = colorInfo.color;
+
 		return `<div style="width: 100%; background: #f1f5f9; border-radius: 8px; height: 24px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
-	<div style="width: ${barWidth}%; background: linear-gradient(90deg, ${barColor}, ${this.adjustColor(barColor, 20)}); height: 100%; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; transition: width 0.3s ease; box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);">
-		<span style="color: ${percentage > 10 ? 'white' : '#64748b'}; font-weight: 600; font-size: 12px; ${percentage <= 10 ? 'margin-left: 8px;' : ''}">${percentage}%</span>
+	<div style="width: ${barWidth}%; background: linear-gradient(90deg, ${barColor}, ${this.adjustColor(
+			barColor,
+			20
+		)}); height: 100%; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; transition: width 0.3s ease; box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);">
+		<span style="color: ${
+			percentage > 12 ? "white" : "#1e293b"
+		}; font-weight: 600; font-size: 12px; ${
+			percentage <= 12 ? "margin-left: 8px;" : ""
+		}">${percentage}%</span>
 	</div>
 </div>`;
 	}
 
 	adjustColor(color: string, amount: number): string {
 		// Simple color adjustment for gradient
-		const num = parseInt(color.replace('#', ''), 16);
+		const num = parseInt(color.replace("#", ""), 16);
 		const r = Math.min(255, Math.max(0, (num >> 16) + amount));
-		const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
-		const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
-		return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+		const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amount));
+		const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amount));
+		return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 	}
 
-	generateChart(data: Array<{week: string, tasks: number, avgPerDay: number, successRate: number}>): string[] {
+	generateChart(
+		data: Array<{
+			week: string;
+			tasks: number;
+			avgPerDay: number;
+			successRate: number;
+		}>
+	): string[] {
 		if (data.length === 0) return [];
 
 		// Find max values - avgPerDay uses its own scale for better visibility
-		const maxAvg = Math.max(...data.map(d => d.avgPerDay), 1);
-		
+		const maxAvg = Math.max(...data.map((d) => d.avgPerDay), 1);
+
 		// Use 100 (for percentage) as the scale for success rate
 		const maxValue = 100;
-		
+
 		const chartHeight = 300;
 		const chartWidth = data.length * 40; // 40px per week
 		const padding = 40;
 
 		const chart: string[] = [];
-		
+
 		// Container with horizontal scroll
-		chart.push('<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; margin: 20px 0; overflow-x: auto;">');
-		
+		chart.push(
+			"<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; margin: 20px 0; overflow-x: auto;\">"
+		);
+
 		// Legend
-		chart.push('<div style="display: flex; gap: 20px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap;">');
-		chart.push('<div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(10px);">');
-		chart.push('<div style="width: 20px; height: 3px; background: #60a5fa; border-radius: 2px;"></div>');
-		chart.push('<span style="color: white; font-weight: 600; font-size: 13px;">Avg Tasks/Day (normalized)</span>');
-		chart.push('</div>');
-		chart.push('<div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(10px);">');
-		chart.push('<div style="width: 20px; height: 3px; background: #f59e0b; border-radius: 2px;"></div>');
-		chart.push('<span style="color: white; font-weight: 600; font-size: 13px;">Success Rate % (0-100)</span>');
-		chart.push('</div>');
-		chart.push('</div>');
-		
+		chart.push(
+			'<div style="display: flex; gap: 20px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap;">'
+		);
+		chart.push(
+			'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(10px);">'
+		);
+		chart.push(
+			'<div style="width: 20px; height: 3px; background: #60a5fa; border-radius: 2px;"></div>'
+		);
+		chart.push(
+			'<span style="color: white; font-weight: 600; font-size: 13px;">Avg Tasks/Day (normalized)</span>'
+		);
+		chart.push("</div>");
+		chart.push(
+			'<div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.15); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(10px);">'
+		);
+		chart.push(
+			'<div style="width: 20px; height: 3px; background: #f59e0b; border-radius: 2px;"></div>'
+		);
+		chart.push(
+			'<span style="color: white; font-weight: 600; font-size: 13px;">Success Rate % (0-100)</span>'
+		);
+		chart.push("</div>");
+		chart.push("</div>");
+
 		// Scale explanation
-		chart.push('<div style="text-align: center; color: rgba(255,255,255,0.9); font-size: 12px; margin-bottom: 15px; font-style: italic;">');
-		chart.push(`Avg/Day: normalized (0-${maxAvg.toFixed(1)}) | Success: 0-100%`);
-		chart.push('</div>');
+		chart.push(
+			'<div style="text-align: center; color: rgba(255,255,255,0.9); font-size: 12px; margin-bottom: 15px; font-style: italic;">'
+		);
+		chart.push(
+			`Avg/Day: normalized (0-${maxAvg.toFixed(1)}) | Success: 0-100%`
+		);
+		chart.push("</div>");
 
 		// SVG Chart container
-		chart.push('<div style="background: white; border-radius: 8px; padding: 30px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); min-width: fit-content;">');
-		chart.push(`<svg width="${chartWidth + padding * 2}" height="${chartHeight + padding * 2}" style="display: block;">`);
-		
+		chart.push(
+			'<div style="background: white; border-radius: 8px; padding: 30px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); min-width: fit-content;">'
+		);
+		chart.push(
+			`<svg width="${chartWidth + padding * 2}" height="${
+				chartHeight + padding * 2
+			}" style="display: block;">`
+		);
+
 		// Draw grid lines
 		for (let i = 0; i <= 4; i++) {
 			const y = padding + (chartHeight / 4) * i;
-			chart.push(`<line x1="${padding}" y1="${y}" x2="${chartWidth + padding}" y2="${y}" stroke="#e5e7eb" stroke-width="1" />`);
+			chart.push(
+				`<line x1="${padding}" y1="${y}" x2="${
+					chartWidth + padding
+				}" y2="${y}" stroke="#e5e7eb" stroke-width="1" />`
+			);
 		}
 
 		// Draw axes
-		chart.push(`<line x1="${padding}" y1="${padding}" x2="${padding}" y2="${chartHeight + padding}" stroke="#374151" stroke-width="2" />`);
-		chart.push(`<line x1="${padding}" y1="${chartHeight + padding}" x2="${chartWidth + padding}" y2="${chartHeight + padding}" stroke="#374151" stroke-width="2" />`);
+		chart.push(
+			`<line x1="${padding}" y1="${padding}" x2="${padding}" y2="${
+				chartHeight + padding
+			}" stroke="#374151" stroke-width="2" />`
+		);
+		chart.push(
+			`<line x1="${padding}" y1="${chartHeight + padding}" x2="${
+				chartWidth + padding
+			}" y2="${
+				chartHeight + padding
+			}" stroke="#374151" stroke-width="2" />`
+		);
 
 		// Calculate points for lines
 		const avgPoints: string[] = [];
 		const successPoints: string[] = [];
 
 		data.forEach((row, i) => {
-			const x = padding + (i * 40) + 20;
-			
+			const x = padding + i * 40 + 20;
+
 			// AvgPerDay is normalized to its own range (0-maxAvg mapped to 0-chartHeight)
 			// Success uses absolute scale (0-100)
-			const avgY = padding + chartHeight - (row.avgPerDay / maxAvg * chartHeight); // Normalized!
-			const successY = padding + chartHeight - ((row.successRate * 100) / maxValue * chartHeight);
+			const avgY =
+				padding + chartHeight - (row.avgPerDay / maxAvg) * chartHeight; // Normalized!
+			const successY =
+				padding +
+				chartHeight -
+				((row.successRate * 100) / maxValue) * chartHeight;
 
 			avgPoints.push(`${x},${avgY}`);
 			successPoints.push(`${x},${successY}`);
 
 			// Draw data points (circles) - only avg and success
-			chart.push(`<circle cx="${x}" cy="${avgY}" r="4" fill="#60a5fa" stroke="white" stroke-width="2" />`);
-			chart.push(`<circle cx="${x}" cy="${successY}" r="4" fill="#f59e0b" stroke="white" stroke-width="2" />`);
+			chart.push(
+				`<circle cx="${x}" cy="${avgY}" r="4" fill="#60a5fa" stroke="white" stroke-width="2" />`
+			);
+			chart.push(
+				`<circle cx="${x}" cy="${successY}" r="4" fill="#f59e0b" stroke="white" stroke-width="2" />`
+			);
 
 			// Week labels
-			const weekLabel = row.week.split('-W')[1] || row.week;
-			chart.push(`<text x="${x}" y="${chartHeight + padding + 20}" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">W${weekLabel}</text>`);
-			
+			const weekLabel = row.week.split("-W")[1] || row.week;
+			chart.push(
+				`<text x="${x}" y="${
+					chartHeight + padding + 20
+				}" text-anchor="middle" font-size="10" fill="#6b7280" font-weight="500">W${weekLabel}</text>`
+			);
+
 			// Hover tooltips
 			chart.push(`<title>Week ${row.week}
 Avg/Day: ${row.avgPerDay}
@@ -417,71 +660,114 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		});
 
 		// Draw lines connecting points - only avg and success
-		chart.push(`<polyline points="${avgPoints.join(' ')}" fill="none" stroke="#60a5fa" stroke-width="3" stroke-linejoin="round" />`);
-		chart.push(`<polyline points="${successPoints.join(' ')}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round" />`);
+		chart.push(
+			`<polyline points="${avgPoints.join(
+				" "
+			)}" fill="none" stroke="#60a5fa" stroke-width="3" stroke-linejoin="round" />`
+		);
+		chart.push(
+			`<polyline points="${successPoints.join(
+				" "
+			)}" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round" />`
+		);
 
 		// Y-axis labels with actual values
 		const yAxisSteps = 5;
 		for (let i = 0; i <= yAxisSteps; i++) {
-			const value = (maxValue / yAxisSteps * i).toFixed(0);
-			const y = padding + chartHeight - (chartHeight / yAxisSteps * i);
-			chart.push(`<text x="${padding - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="#6b7280" font-weight="500">${value}</text>`);
+			const value = ((maxValue / yAxisSteps) * i).toFixed(0);
+			const y = padding + chartHeight - (chartHeight / yAxisSteps) * i;
+			chart.push(
+				`<text x="${padding - 10}" y="${
+					y + 4
+				}" text-anchor="end" font-size="11" fill="#6b7280" font-weight="500">${value}</text>`
+			);
 		}
 
-		chart.push('</svg>');
-		
+		chart.push("</svg>");
+
 		// Stats summary below chart
-		chart.push('<div style="display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; justify-content: center;">');
-		const avgSuccess = ((data.reduce((sum, d) => sum + d.successRate, 0) / data.length) * 100).toFixed(1);
-		const avgTasksPerDay = (data.reduce((sum, d) => sum + d.avgPerDay, 0) / data.length).toFixed(1);
-		
+		chart.push(
+			'<div style="display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; justify-content: center;">'
+		);
+		const avgSuccess = (
+			(data.reduce((sum, d) => sum + d.successRate, 0) / data.length) *
+			100
+		).toFixed(1);
+		const avgTasksPerDay = (
+			data.reduce((sum, d) => sum + d.avgPerDay, 0) / data.length
+		).toFixed(1);
+
 		chart.push(`<div style="background: #eff6ff; padding: 12px 20px; border-radius: 8px; border-left: 4px solid #60a5fa;">
 			<div style="font-size: 11px; color: #1e40af; font-weight: 600; margin-bottom: 4px;">AVG PER DAY</div>
 			<div style="font-size: 20px; color: #2563eb; font-weight: 700;">${avgTasksPerDay}</div>
 		</div>`);
-		
+
 		chart.push(`<div style="background: #fffbeb; padding: 12px 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
 			<div style="font-size: 11px; color: #92400e; font-weight: 600; margin-bottom: 4px;">AVG SUCCESS</div>
 			<div style="font-size: 20px; color: #d97706; font-weight: 700;">${avgSuccess}%</div>
 		</div>`);
-		
-		chart.push('</div>');
-		
-		chart.push('</div>'); // End chart container
-		chart.push('</div>'); // End main container
+
+		chart.push("</div>");
+
+		chart.push("</div>"); // End chart container
+		chart.push("</div>"); // End main container
 
 		return chart;
 	}
 
 	async updateWeekProgress(weekMoment: moment.Moment) {
 		const weekFileName = getWeekFileName(this.settings, weekMoment);
-		const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-		const dailyStats: {day: string, completed: number, total: number, percentage: number}[] = [];
-		const taskAttendance: Map<string, {completed: number, total: number}> = new Map();
-		
+		const dayNames = [
+			"Monday",
+			"Tuesday",
+			"Wednesday",
+			"Thursday",
+			"Friday",
+			"Saturday",
+			"Sunday",
+		];
+		const dailyStats: {
+			day: string;
+			completed: number;
+			total: number;
+			percentage: number;
+		}[] = [];
+		const taskAttendance: Map<
+			string,
+			{ completed: number; total: number }
+		> = new Map();
+
 		let totalTasks = 0;
 		let completedTasks = 0;
-		
+
 		// Count tasks from all days of the week
 		for (let i = 1; i <= 7; i++) {
 			const dayDate = this.getDayOfWeek(weekMoment, i);
 			const dayFileName = getDayFileName(this.settings, dayDate);
 			let dayCompleted = 0;
 			let dayTotal = 0;
-			
+
 			try {
-				const dayContent = await this.app.vault.adapter.read(dayFileName);
-				const lines = dayContent.split('\n');
-				
+				const dayContent = await this.app.vault.adapter.read(
+					dayFileName
+				);
+				const lines = dayContent.split("\n");
+
 				for (const line of lines) {
 					if (line.trim().startsWith(TODO_PREFIX)) {
 						totalTasks++;
 						dayTotal++;
-						
+
 						// Track task attendance
-						const taskName = line.trim().replace(TODO_PREFIX, '').trim();
+						const taskName = line
+							.trim()
+							.replace(TODO_PREFIX, "")
+							.trim();
 						if (!taskAttendance.has(taskName)) {
-							taskAttendance.set(taskName, {completed: 0, total: 0});
+							taskAttendance.set(taskName, {
+								completed: 0,
+								total: 0,
+							});
 						}
 						const stats = taskAttendance.get(taskName)!;
 						stats.total++;
@@ -490,11 +776,17 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 						completedTasks++;
 						dayTotal++;
 						dayCompleted++;
-						
+
 						// Track task attendance
-						const taskName = line.trim().replace(TODO_DONE_PREFIX, '').trim();
+						const taskName = line
+							.trim()
+							.replace(TODO_DONE_PREFIX, "")
+							.trim();
 						if (!taskAttendance.has(taskName)) {
-							taskAttendance.set(taskName, {completed: 0, total: 0});
+							taskAttendance.set(taskName, {
+								completed: 0,
+								total: 0,
+							});
 						}
 						const stats = taskAttendance.get(taskName)!;
 						stats.total++;
@@ -504,166 +796,255 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			} catch (error) {
 				// Day file doesn't exist, skip
 			}
-			
+
 			// Store daily stats
-			const dayPercentage = dayTotal > 0 ? Math.round((dayCompleted / dayTotal) * 100) : 0;
+			const dayPercentage =
+				dayTotal > 0 ? Math.round((dayCompleted / dayTotal) * 100) : 0;
 			dailyStats.push({
 				day: dayNames[i - 1],
 				completed: dayCompleted,
 				total: dayTotal,
-				percentage: dayPercentage
+				percentage: dayPercentage,
 			});
 		}
-		
+
 		// Sort task attendance by completion rate (lowest to highest)
 		const sortedAttendance = Array.from(taskAttendance.entries())
 			.map(([task, stats]) => ({
 				task,
 				completed: stats.completed,
 				total: stats.total,
-				percentage: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
+				percentage:
+					stats.total > 0
+						? Math.round((stats.completed / stats.total) * 100)
+						: 0,
 			}))
 			.sort((a, b) => a.percentage - b.percentage);
-		
+
 		// Build progress report with HTML styling
 		const weekContent = await this.app.vault.adapter.read(weekFileName);
-		const lines = weekContent.split('\n');
-		const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-		
+		const lines = weekContent.split("\n");
+		const percentage =
+			totalTasks > 0
+				? Math.round((completedTasks / totalTasks) * 100)
+				: 0;
+
 		const progressReport = [
-			'',
-			'---',
-			'',
-			'## 📊 Week Progress',
-			'',
+			"",
+			"---",
+			"",
+			"## 📊 Week Progress",
+			"",
 			'<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; margin: 10px 0;">',
 			`<div style="font-size: 18px; font-weight: 600; margin-bottom: 15px;">Overall Progress: ${completedTasks}/${totalTasks} tasks</div>`,
 			this.generateProgressBar(percentage),
-			'</div>',
-			'',
-			'### 📅 Daily Summary',
-			'',
-			'<div style="display: grid; gap: 12px; margin: 15px 0;">'
+			"</div>",
+			"",
+			"### 📅 Daily Summary",
+			"",
+			'<div style="display: grid; gap: 12px; margin: 15px 0;">',
 		];
-		
+
 		// Add daily progress with enhanced styling
 		for (const dayStat of dailyStats) {
 			if (dayStat.total > 0) {
-				progressReport.push(`<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`);
-				progressReport.push(`<div style="font-weight: 600; color: #1e293b; margin-bottom: 8px; font-size: 14px;">${dayStat.day}: ${dayStat.completed}/${dayStat.total}</div>`);
-				progressReport.push(this.generateProgressBar(dayStat.percentage));
-				progressReport.push('</div>');
+				progressReport.push(
+					`<div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`
+				);
+				progressReport.push(
+					`<div style="font-weight: 600; color: #1e293b; margin-bottom: 8px; font-size: 14px;">${dayStat.day}: ${dayStat.completed}/${dayStat.total}</div>`
+				);
+				progressReport.push(
+					this.generateProgressBar(dayStat.percentage)
+				);
+				progressReport.push("</div>");
 			}
 		}
-		
-		progressReport.push('</div>');
-		
+
+		progressReport.push("</div>");
+
 		// Add task attendance ranking with enhanced styling
 		if (sortedAttendance.length > 0) {
-			progressReport.push('');
-			progressReport.push('### 🎯 Task Attendance');
-			progressReport.push('*Ordered from lowest to highest completion rate*');
-			progressReport.push('');
-			progressReport.push('<div style="display: grid; gap: 10px; margin: 15px 0;">');
-			
+			progressReport.push("");
+			progressReport.push("### 🎯 Task Attendance");
+			progressReport.push(
+				"*Ordered from lowest to highest completion rate*"
+			);
+			progressReport.push("");
+			progressReport.push(
+				'<div style="display: grid; gap: 10px; margin: 15px 0;">'
+			);
+
 			for (const taskStat of sortedAttendance) {
 				// Color code based on attendance
-				let borderColor = '#ef4444'; // red
+				let borderColor = "#ef4444"; // red
 				if (taskStat.percentage >= 80) {
-					borderColor = '#22c55e'; // green
+					borderColor = "#22c55e"; // green
 				} else if (taskStat.percentage >= 50) {
-					borderColor = '#eab308'; // yellow
+					borderColor = "#eab308"; // yellow
 				}
-				
-				progressReport.push(`<div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`);
-				progressReport.push(`<div style="font-weight: 500; color: #334155; margin-bottom: 6px; font-size: 13px;">${taskStat.task}: ${taskStat.completed}/${taskStat.total}</div>`);
-				progressReport.push(this.generateProgressBar(taskStat.percentage));
-				progressReport.push('</div>');
+
+				progressReport.push(
+					`<div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid ${borderColor}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`
+				);
+				progressReport.push(
+					`<div style="font-weight: 500; color: #334155; margin-bottom: 6px; font-size: 13px;">${taskStat.task}: ${taskStat.completed}/${taskStat.total}</div>`
+				);
+				progressReport.push(
+					this.generateProgressBar(taskStat.percentage)
+				);
+				progressReport.push("</div>");
 			}
-			
-			progressReport.push('</div>');
+
+			progressReport.push("</div>");
 		}
-		
+
 		// Remove old progress section if exists
-		const progressStartIndex = lines.findIndex(line => 
-			line.includes('📊 Week Progress') || line.includes('**Week Progress:**') || line.includes('**Overall:**')
+		const progressStartIndex = lines.findIndex(
+			(line) =>
+				line.includes("📊 Week Progress") ||
+				line.includes("**Week Progress:**") ||
+				line.includes("**Overall:**")
 		);
-		
+
 		if (progressStartIndex !== -1) {
 			// Find the start of the progress section (look for separator or section header before it)
 			let sectionStart = progressStartIndex;
 			for (let i = progressStartIndex - 1; i >= 0; i--) {
-				if (lines[i].trim() === '---') {
+				if (lines[i].trim() === "---") {
 					// Check if this is the separator before the progress section
-					if (i + 2 < lines.length && lines[i + 2].includes('📊')) {
+					if (i + 2 < lines.length && lines[i + 2].includes("📊")) {
 						sectionStart = i;
 						break;
 					}
-				} else if (lines[i].trim().startsWith('##') && lines[i].includes('📊')) {
+				} else if (
+					lines[i].trim().startsWith("##") &&
+					lines[i].includes("📊")
+				) {
 					sectionStart = i;
 					break;
 				}
 			}
-			
+
 			// Remove only the progress section (from sectionStart to end of file)
 			lines.splice(sectionStart);
 		}
-		
+
 		// Add progress report at the end, preserving tasks
-		const newContent = lines.join('\n').trimEnd() + '\n' + progressReport.join('\n') + '\n';
+		const newContent =
+			lines.join("\n").trimEnd() +
+			"\n" +
+			progressReport.join("\n") +
+			"\n";
 		await this.app.vault.adapter.write(weekFileName, newContent);
 	}
 
-	async processWeekTasks(weekContent: string, weekMoment: moment.Moment): Promise<{processed: number, ignored: string[]}> {
-		const lines = weekContent.split('\n');
+	async processWeekTasks(
+		weekContent: string,
+		weekMoment: moment.Moment
+	): Promise<{ processed: number; ignored: string[] }> {
+		const lines = weekContent.split("\n");
 		const weekFileName = getWeekFileName(this.settings, weekMoment);
 		let processed = 0;
 		const ignored: string[] = [];
-		
+
 		for (const line of lines) {
-			if (line.trim().startsWith(TODO_PREFIX) || line.trim().startsWith(TODO_DONE_PREFIX)) {
+			if (
+				line.trim().startsWith(TODO_PREFIX) ||
+				line.trim().startsWith(TODO_DONE_PREFIX)
+			) {
 				const task = line.trim();
-				const taskText = task.replace(TODO_PREFIX, '').replace(TODO_DONE_PREFIX, '').trim();
-				
+				const taskText = task
+					.replace(TODO_PREFIX, "")
+					.replace(TODO_DONE_PREFIX, "")
+					.trim();
+
 				// Valid patterns:
-				// 1. "task name - #morning/#afternoon/#night - #days" (with shift and multiple/single days)
-				// 2. "task name - #morning/#afternoon/#night" (with shift for all working days)
-				// 3. "task name - #days" (multiple/single days without shift)
-				// 4. "task name" (all working days without shift)
-				
-				// Pattern for shift + days: supports single (#1), multiple (#1,3,5), or ranges (#2-5)
-				const shiftDayMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#([\d,\-]+)$/i);
-				const shiftOnlyMatch = taskText.match(/^(.+?)\s-\s#(morning|afternoon|night)$/i);
+				// 1. "[x-x-xxx] - task name - #shift" (mask-based selection with optional shift)
+				// 2. "task name - #morning/#afternoon/#night - #days" (with shift and multiple/single days)
+				// 3. "task name - #morning/#afternoon/#night" (with shift for all working days)
+				// 4. "task name - #days" (multiple/single days without shift)
+				// 5. "task name" (all working days without shift)
+
+				const maskMatch = taskText.match(
+					/^\[([xX-]{7})\]\s-\s(.+?)(?:\s-\s#(morning|afternoon|night))?$/i
+				);
+				const shiftDayMatch = taskText.match(
+					/^(.+?)\s-\s#(morning|afternoon|night)\s-\s#([\d,\-]+)$/i
+				);
+				const shiftOnlyMatch = taskText.match(
+					/^(.+?)\s-\s#(morning|afternoon|night)$/i
+				);
 				const dayOnlyMatch = taskText.match(/^(.+?)\s-\s#([\d,\-]+)$/);
-				const noPatternMatch = !taskText.includes(' - ');
-				
-				if (shiftDayMatch) {
+				const noPatternMatch = !taskText.includes(" - ");
+
+				if (maskMatch) {
+					const mask = maskMatch[1];
+					const taskName = maskMatch[2].trim();
+					const shift = maskMatch[3]?.toLowerCase();
+					const days = this.parseDayMask(mask);
+
+					if (days.length > 0) {
+						for (const dayNum of days) {
+							const dayDate = this.getDayOfWeek(
+								weekMoment,
+								dayNum
+							);
+							await this.addTaskToDay(
+								dayDate,
+								taskName,
+								weekFileName,
+								shift
+							);
+						}
+						processed++;
+					} else {
+						ignored.push(
+							`"${taskText}" - invalid mask format. Use [x-x-xxx] with 7 positions (x = active, - = inactive).`
+						);
+					}
+				} else if (shiftDayMatch) {
 					// Task with shift and specific days: "caminhar - #morning - #1,3,5"
 					const taskName = shiftDayMatch[1].trim();
 					const shift = shiftDayMatch[2].toLowerCase();
 					const daysStr = shiftDayMatch[3];
 					const days = this.parseDays(daysStr);
-					
+
 					if (days.length > 0) {
 						for (const dayNum of days) {
 							if (dayNum >= 1 && dayNum <= 7) {
-								const dayDate = this.getDayOfWeek(weekMoment, dayNum);
-								await this.addTaskToDay(dayDate, taskName, weekFileName, shift);
+								const dayDate = this.getDayOfWeek(
+									weekMoment,
+									dayNum
+								);
+								await this.addTaskToDay(
+									dayDate,
+									taskName,
+									weekFileName,
+									shift
+								);
 							}
 						}
 						processed++;
 					} else {
-						ignored.push(`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`);
+						ignored.push(
+							`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`
+						);
 					}
 				} else if (shiftOnlyMatch) {
 					// Task with shift for all working days: "exercícios - #morning"
 					const taskName = shiftOnlyMatch[1].trim();
 					const shift = shiftOnlyMatch[2].toLowerCase();
-					
+
 					for (let i = 1; i <= 7; i++) {
 						const dayDate = this.getDayOfWeek(weekMoment, i);
 						if (this.isWorkingDay(dayDate)) {
-							await this.addTaskToDay(dayDate, taskName, weekFileName, shift);
+							await this.addTaskToDay(
+								dayDate,
+								taskName,
+								weekFileName,
+								shift
+							);
 						}
 					}
 					processed++;
@@ -672,54 +1053,75 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					const taskName = dayOnlyMatch[1].trim();
 					const daysStr = dayOnlyMatch[2];
 					const days = this.parseDays(daysStr);
-					
+
 					if (days.length > 0) {
 						for (const dayNum of days) {
 							if (dayNum >= 1 && dayNum <= 7) {
-								const dayDate = this.getDayOfWeek(weekMoment, dayNum);
-								await this.addTaskToDay(dayDate, taskName, weekFileName);
+								const dayDate = this.getDayOfWeek(
+									weekMoment,
+									dayNum
+								);
+								await this.addTaskToDay(
+									dayDate,
+									taskName,
+									weekFileName
+								);
 							}
 						}
 						processed++;
 					} else {
-						ignored.push(`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`);
+						ignored.push(
+							`"${taskText}" - invalid day format (use #1, #1,3,5, or #2-5)`
+						);
 					}
 				} else if (noPatternMatch) {
 					// Task for all working days without shift: "fazer relatório"
 					for (let i = 1; i <= 7; i++) {
 						const dayDate = this.getDayOfWeek(weekMoment, i);
 						if (this.isWorkingDay(dayDate)) {
-							await this.addTaskToDay(dayDate, taskText, weekFileName);
+							await this.addTaskToDay(
+								dayDate,
+								taskText,
+								weekFileName
+							);
 						}
 					}
 					processed++;
 				} else {
 					// Invalid syntax - has " - " but doesn't match any pattern
-					ignored.push(`"${taskText}" - invalid syntax. Use: "task - #shift - #days", "task - #shift", "task - #days", or "task"`);
+					ignored.push(
+						`"${taskText}" - invalid syntax. Use: "[mask] - task - #shift", "task - #shift - #days", "task - #shift", "task - #days", or "task"`
+					);
 				}
 			}
 		}
-		
-		return {processed, ignored};
+
+		return { processed, ignored };
 	}
 
 	parseDays(daysStr: string): number[] {
 		const days: Set<number> = new Set();
-		
+
 		// Split by comma for multiple entries
-		const parts = daysStr.split(',');
-		
+		const parts = daysStr.split(",");
+
 		for (const part of parts) {
 			const trimmed = part.trim();
-			
+
 			// Check if it's a range (e.g., "2-5")
-			if (trimmed.includes('-')) {
-				const rangeParts = trimmed.split('-');
+			if (trimmed.includes("-")) {
+				const rangeParts = trimmed.split("-");
 				if (rangeParts.length === 2) {
 					const start = parseInt(rangeParts[0].trim());
 					const end = parseInt(rangeParts[1].trim());
-					
-					if (!isNaN(start) && !isNaN(end) && start >= 1 && end <= 7 && start <= end) {
+
+					if (
+						!isNaN(start) &&
+						!isNaN(end) &&
+						start >= 1 &&
+						end <= 7 &&
+						start <= end
+					) {
 						for (let i = start; i <= end; i++) {
 							days.add(i);
 						}
@@ -733,8 +1135,26 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 				}
 			}
 		}
-		
+
 		return Array.from(days).sort((a, b) => a - b);
+	}
+
+	parseDayMask(mask: string): number[] {
+		if (!mask || mask.length !== 7) {
+			return [];
+		}
+
+		const days: number[] = [];
+		for (let i = 0; i < mask.length; i++) {
+			const char = mask[i].toLowerCase();
+			if (char === "x") {
+				days.push(i + 1);
+			} else if (char !== "-") {
+				return [];
+			}
+		}
+
+		return days;
 	}
 
 	async updateWeeklySummary() {
@@ -743,23 +1163,25 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		const summaryFileName = `${this.settings.baseDir}/Summary.md`;
 		const weekNumber = getCalendarWeek(m);
 		const year = m.year();
-		const weekKey = `${year}-W${weekNumber.toString().padStart(2, '0')}`;
-		
+		const weekKey = `${year}-W${weekNumber.toString().padStart(2, "0")}`;
+
 		// Calculate week statistics
 		let totalPlannedTasks = 0;
 		let totalCompletedTasks = 0;
 		const daysWithTasks: number[] = [];
-		
+
 		// Count tasks from daily files
 		for (let i = 1; i <= 7; i++) {
 			const dayDate = this.getDayOfWeek(m, i);
 			const dayFileName = getDayFileName(this.settings, dayDate);
 			let dayTaskCount = 0;
-			
+
 			try {
-				const dayContent = await this.app.vault.adapter.read(dayFileName);
-				const lines = dayContent.split('\n');
-				
+				const dayContent = await this.app.vault.adapter.read(
+					dayFileName
+				);
+				const lines = dayContent.split("\n");
+
 				for (const line of lines) {
 					if (line.trim().startsWith(TODO_DONE_PREFIX)) {
 						totalCompletedTasks++;
@@ -770,7 +1192,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 						dayTaskCount++;
 					}
 				}
-				
+
 				if (dayTaskCount > 0) {
 					daysWithTasks.push(dayTaskCount);
 				}
@@ -778,41 +1200,49 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 				// Day file doesn't exist, skip
 			}
 		}
-		
+
 		// Calculate statistics
-		const avgTasksPerDay = daysWithTasks.length > 0 
-			? (daysWithTasks.reduce((a, b) => a + b, 0) / daysWithTasks.length).toFixed(1)
-			: '0.0';
-		const successRate = totalPlannedTasks > 0
-			? (totalCompletedTasks / totalPlannedTasks).toFixed(3)
-			: '0.000';
-		
+		const avgTasksPerDay =
+			daysWithTasks.length > 0
+				? (
+						daysWithTasks.reduce((a, b) => a + b, 0) /
+						daysWithTasks.length
+				  ).toFixed(1)
+				: "0.0";
+		const successRate =
+			totalPlannedTasks > 0
+				? (totalCompletedTasks / totalPlannedTasks).toFixed(3)
+				: "0.000";
+
 		// Create or update summary file
-		let summaryContent = '';
+		let summaryContent = "";
 		let fileExists = true;
 		try {
 			summaryContent = await this.app.vault.adapter.read(summaryFileName);
 		} catch (error) {
 			fileExists = false;
 		}
-		
-		const lines = summaryContent.split('\n');
-		
+
+		const lines = summaryContent.split("\n");
+
 		// Build the week filename without full path
 		const weekFileShortName = `Calweek-${year}-${weekNumber}`;
 		const weekLinkText = `[[${weekFileShortName}]]`;
 		const newRow = `| ${weekLinkText} | ${avgTasksPerDay} | ${successRate} |`;
-		
+
 		// Find if current week already exists in table
 		let weekRowIndex = -1;
 		for (let i = 0; i < lines.length; i++) {
 			// Check if line contains the week key or the week file name
-			if (lines[i].includes(weekKey) || lines[i].includes(weekFileShortName)) {
+			if (
+				lines[i].includes(weekKey) ||
+				lines[i].includes(weekFileShortName)
+			) {
 				weekRowIndex = i;
 				break;
 			}
 		}
-		
+
 		if (weekRowIndex !== -1) {
 			// Update existing row
 			lines[weekRowIndex] = newRow;
@@ -820,44 +1250,51 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			// Find the last row of the table to add new entry
 			let lastTableRowIndex = -1;
 			let inTable = false;
-			
+
 			for (let i = 0; i < lines.length; i++) {
 				const trimmed = lines[i].trim();
-				
+
 				// Detect table separator
-				if (trimmed.startsWith('|') && trimmed.includes('---')) {
+				if (trimmed.startsWith("|") && trimmed.includes("---")) {
 					inTable = true;
 					continue;
 				}
-				
+
 				// If we're in a table and find a row
-				if (inTable && trimmed.startsWith('|') && !trimmed.includes('---')) {
+				if (
+					inTable &&
+					trimmed.startsWith("|") &&
+					!trimmed.includes("---")
+				) {
 					lastTableRowIndex = i;
 				}
-				
+
 				// If we're in a table and hit a non-table line, we're done
-				if (inTable && !trimmed.startsWith('|') && trimmed.length > 0) {
+				if (inTable && !trimmed.startsWith("|") && trimmed.length > 0) {
 					break;
 				}
 			}
-			
+
 			if (lastTableRowIndex !== -1) {
 				// Insert after the last table row
 				lines.splice(lastTableRowIndex + 1, 0, newRow);
 			} else {
 				// No table found - shouldn't happen if file exists with table
-				new Notice('⚠️ Table not found in Summary.md. Please create a table with headers: Week | Avg Tasks/Day | Success Rate');
+				new Notice(
+					"⚠️ Table not found in Summary.md. Please create a table with headers: Week | Avg Tasks/Day | Success Rate"
+				);
 				return;
 			}
 		}
-		
-		await this.app.vault.adapter.write(summaryFileName, lines.join('\n'));
+
+		await this.app.vault.adapter.write(summaryFileName, lines.join("\n"));
 
 		// Generate and add chart
 		await this.addChartToSummary(summaryFileName);
 
 		// Open the summary file
-		const summaryFile = this.app.vault.getAbstractFileByPath(summaryFileName);
+		const summaryFile =
+			this.app.vault.getAbstractFileByPath(summaryFileName);
 		if (summaryFile) {
 			await this.app.workspace.getLeaf().openFile(summaryFile as any);
 		}
@@ -867,25 +1304,35 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 
 	async addChartToSummary(summaryFileName: string) {
 		try {
-			const summaryContent = await this.app.vault.adapter.read(summaryFileName);
-			const lines = summaryContent.split('\n');
+			const summaryContent = await this.app.vault.adapter.read(
+				summaryFileName
+			);
+			const lines = summaryContent.split("\n");
 
 			// Extract data from table
-			const chartData: Array<{week: string, tasks: number, avgPerDay: number, successRate: number}> = [];
+			const chartData: Array<{
+				week: string;
+				tasks: number;
+				avgPerDay: number;
+				successRate: number;
+			}> = [];
 			let inTable = false;
 
 			for (const line of lines) {
 				const trimmed = line.trim();
 
 				// Detect table separator
-				if (trimmed.startsWith('|') && trimmed.includes('---')) {
+				if (trimmed.startsWith("|") && trimmed.includes("---")) {
 					inTable = true;
 					continue;
 				}
 
 				// Parse table rows
-				if (inTable && trimmed.startsWith('|')) {
-					const cells = trimmed.split('|').map(c => c.trim()).filter(c => c.length > 0);
+				if (inTable && trimmed.startsWith("|")) {
+					const cells = trimmed
+						.split("|")
+						.map((c) => c.trim())
+						.filter((c) => c.length > 0);
 					if (cells.length >= 3) {
 						// Extract week from link: [[Calweek-2025-46]] -> 2025-W46
 						const weekMatch = cells[0].match(/Calweek-(\d+)-(\d+)/);
@@ -895,13 +1342,18 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 							const successRate = parseFloat(cells[2]) || 0;
 							const tasks = 0; // Not stored anymore, just for compatibility
 
-							chartData.push({week: weekLabel, tasks, avgPerDay, successRate});
+							chartData.push({
+								week: weekLabel,
+								tasks,
+								avgPerDay,
+								successRate,
+							});
 						}
 					}
 				}
 
 				// Stop if we exit the table
-				if (inTable && !trimmed.startsWith('|') && trimmed.length > 0) {
+				if (inTable && !trimmed.startsWith("|") && trimmed.length > 0) {
 					break;
 				}
 			}
@@ -912,7 +1364,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			let chartStartIndex = -1;
 
 			for (let i = 0; i < lines.length; i++) {
-				if (lines[i].includes('📈 Weekly Trends')) {
+				if (lines[i].includes("📈 Weekly Trends")) {
 					chartStartIndex = i;
 					break;
 				}
@@ -921,43 +1373,328 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			if (chartStartIndex !== -1) {
 				// Remove everything from the chart header to the end of file
 				// Check if there's an empty line before the header
-				const removeStart = chartStartIndex > 0 && lines[chartStartIndex - 1].trim() === '' ? chartStartIndex - 1 : chartStartIndex;
+				const removeStart =
+					chartStartIndex > 0 &&
+					lines[chartStartIndex - 1].trim() === ""
+						? chartStartIndex - 1
+						: chartStartIndex;
 				lines.splice(removeStart);
 			}
 
-			// Generate new chart
+			// Generate new chart and heatmap
 			const chart = this.generateChart(chartData.slice(-16)); // Show last 16 weeks
+			const heatmap = await this.generateDailyCommitmentHeatmap();
 
-			// Add chart at the end
-			const chartSection = ['', '## 📈 Weekly Trends', '', ...chart];
-			lines.push(...chartSection);
+			// Add chart (and heatmap) at the end
+			const analyticsSection = ["", "## 📈 Weekly Trends", "", ...chart];
+			if (heatmap.length > 0) {
+				analyticsSection.push("", ...heatmap);
+			}
+			lines.push(...analyticsSection);
 
-			await this.app.vault.adapter.write(summaryFileName, lines.join('\n'));
+			await this.app.vault.adapter.write(
+				summaryFileName,
+				lines.join("\n")
+			);
 		} catch (error) {
-			console.error('Error adding chart to summary:', error);
+			console.error("Error adding chart to summary:", error);
 		}
+	}
+
+	async generateDailyCommitmentHeatmap(): Promise<string[]> {
+		const today = moment().endOf("day");
+		const rangeStart = today.clone().subtract(6, "months").startOf("day");
+		const calendarStart = rangeStart.clone().startOf("isoWeek");
+
+		type HeatmapDay = {
+			date: moment.Moment;
+			ratio: number | null;
+			total: number;
+			completed: number;
+			isFuture: boolean;
+			isPadding: boolean;
+		};
+
+		const weeks: HeatmapDay[][] = [];
+		let currentWeek: HeatmapDay[] = [];
+		let cursor = calendarStart.clone();
+
+		while (cursor.isSameOrBefore(today, "day")) {
+			const isPadding = cursor.isBefore(rangeStart, "day");
+			const stats = isPadding
+				? { total: 0, completed: 0 }
+				: await this.getDailyTaskStats(cursor.toDate());
+			const ratio =
+				!isPadding && stats.total > 0
+					? stats.completed / stats.total
+					: null;
+
+			currentWeek.push({
+				date: cursor.clone(),
+				ratio,
+				total: stats.total,
+				completed: stats.completed,
+				isFuture: false,
+				isPadding,
+			});
+
+			if (currentWeek.length === 7) {
+				weeks.push(currentWeek);
+				currentWeek = [];
+			}
+
+			cursor.add(1, "day");
+		}
+
+		if (currentWeek.length > 0) {
+			while (currentWeek.length < 7) {
+				currentWeek.push({
+					date: cursor.clone(),
+					ratio: null,
+					total: 0,
+					completed: 0,
+					isFuture: true,
+					isPadding: false,
+				});
+				cursor.add(1, "day");
+			}
+			weeks.push(currentWeek);
+		}
+
+		if (weeks.length === 0) {
+			return [];
+		}
+
+		const dayLabels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+		const monthNames = [
+			"Jan",
+			"Fev",
+			"Mar",
+			"Abr",
+			"Mai",
+			"Jun",
+			"Jul",
+			"Ago",
+			"Set",
+			"Out",
+			"Nov",
+			"Dez",
+		];
+
+		const monthLabels: Array<{ index: number; label: string }> = [];
+		let lastLabel = "";
+		for (let i = 0; i < weeks.length; i++) {
+			const referenceDay = weeks[i].find(
+				(day) => !day.isPadding && !day.isFuture
+			);
+			if (referenceDay) {
+				const label = monthNames[referenceDay.date.month()];
+				if (label !== lastLabel) {
+					monthLabels.push({ index: i, label });
+					lastLabel = label;
+				}
+			}
+		}
+		const monthLabelMap = new Map(
+			monthLabels.map((entry) => [entry.index, entry.label])
+		);
+
+		const legendItems = [
+			{ label: "<50%", color: "#ef4444" },
+			{ label: "50-60%", color: "#f97316" },
+			{ label: "70-80%", color: "#eab308" },
+			{ label: "80-90%", color: "#22c55e" },
+			{ label: "90-99%", color: "#2563eb" },
+			{ label: "100%", color: "#2563eb", star: true },
+		];
+
+		const heatmap: string[] = [
+			"## 🟩 Daily Commitment",
+			"",
+			'<div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(15,23,42,0.08); margin: 10px 0;">',
+			'<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">',
+			'<div style="font-weight: 600; color: #0f172a;">Comprometimento diário (últimos 6 meses)</div>',
+			'<div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: #475569; flex-wrap: wrap;">',
+		];
+
+		for (const item of legendItems) {
+			heatmap.push(
+				`<span style="display: inline-flex; align-items: center; gap: 4px;">` +
+					`<span style="width: 16px; height: 16px; border-radius: 3px; background: ${
+						item.color
+					}; border: 1px solid rgba(15,23,42,0.08); display: inline-flex; align-items: center; justify-content: center; color: #facc15; font-size: 10px;">${
+						item.star ? "★" : ""
+					}</span>` +
+					`<span>${item.label}</span>` +
+					"</span>"
+			);
+		}
+
+		heatmap.push(
+			"</div>",
+			"</div>",
+			'<div style="overflow-x: auto; margin-top: 16px;">',
+			'<div style="display: flex; flex-direction: column; gap: 6px; min-width: 420px;">'
+		);
+
+		const monthRow: string[] = [
+			'<div style="display: flex; gap: 4px; margin-left: 36px; font-size: 10px; color: #94a3b8;">',
+		];
+		for (let weekIndex = 0; weekIndex < weeks.length; weekIndex++) {
+			const label = monthLabelMap.get(weekIndex) ?? "&nbsp;";
+			monthRow.push(
+				`<div style="width: 16px; text-align: center;">${label}</div>`
+			);
+		}
+		monthRow.push("</div>");
+		heatmap.push(...monthRow);
+
+		heatmap.push('<div style="display: flex; gap: 4px;">');
+		heatmap.push(
+			'<div style="display: grid; gap: 4px; font-size: 10px; color: #94a3b8;">'
+		);
+		for (const label of dayLabels) {
+			heatmap.push(
+				`<span style="height: 16px; line-height: 16px;">${label}</span>`
+			);
+		}
+		heatmap.push("</div>");
+
+		heatmap.push('<div style="display: flex; gap: 4px;">');
+		for (const week of weeks) {
+			heatmap.push('<div style="display: grid; gap: 4px;">');
+			for (const day of week) {
+				const color = this.getHeatmapColor(
+					day.ratio,
+					day.isFuture,
+					day.isPadding
+				);
+				const isPerfect =
+					!day.isFuture &&
+					!day.isPadding &&
+					this.getCommitmentColor(day.ratio).star;
+				let tooltip = day.date.format("DD/MM/YYYY");
+				if (day.isFuture) {
+					tooltip += " • dia futuro";
+				} else if (day.isPadding) {
+					tooltip += " • fora do período analisado";
+				} else if (day.ratio === null) {
+					tooltip += " • nenhuma tarefa registrada";
+				} else {
+					const pct = Math.round(day.ratio * 100);
+					tooltip += ` • ${pct}% (${day.completed}/${day.total})`;
+				}
+				const safeTooltip = tooltip.replace(/"/g, "&quot;");
+				heatmap.push(
+					`<div style="width: 16px; height: 16px; border-radius: 3px; background: ${color}; border: 1px solid rgba(15,23,42,0.08); position: relative; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #facc15;" title="${safeTooltip}">${
+						isPerfect ? "★" : ""
+					}</div>`
+				);
+			}
+			heatmap.push("</div>");
+		}
+		heatmap.push("</div>");
+		heatmap.push("</div>");
+		heatmap.push("</div>");
+		heatmap.push(
+			'<p style="margin-top: 12px; color: #475569; font-size: 12px;">Cada quadrado representa tarefas concluídas versus planejadas em um dia.</p>'
+		);
+		heatmap.push("</div>");
+
+		return heatmap;
+	}
+
+	getCommitmentColor(ratio: number | null): { color: string; star: boolean } {
+		if (ratio === null || !isFinite(ratio)) {
+			return { color: "#e2e8f0", star: false };
+		}
+		const pct = Math.max(0, ratio) * 100;
+		if (pct >= 100) {
+			return { color: "#2563eb", star: true };
+		}
+		if (pct >= 90) {
+			return { color: "#2563eb", star: false };
+		}
+		if (pct >= 80) {
+			return { color: "#22c55e", star: false };
+		}
+		if (pct >= 70) {
+			return { color: "#eab308", star: false };
+		}
+		if (pct >= 50) {
+			return { color: "#f97316", star: false };
+		}
+		return { color: "#ef4444", star: false };
+	}
+
+	getHeatmapColor(
+		ratio: number | null,
+		isFuture: boolean,
+		isPadding: boolean
+	): string {
+		if (isFuture || isPadding) {
+			return "#f8fafc";
+		}
+		return this.getCommitmentColor(ratio).color;
+	}
+
+	async getDailyTaskStats(
+		date: Date
+	): Promise<{ total: number; completed: number }> {
+		const dayFileName = getDayFileName(this.settings, date);
+		let total = 0;
+		let completed = 0;
+
+		try {
+			const content = await this.app.vault.adapter.read(dayFileName);
+			const lines = content.split("\n");
+			for (const line of lines) {
+				if (line.trim().startsWith(TODO_DONE_PREFIX)) {
+					total++;
+					completed++;
+				} else if (line.trim().startsWith(TODO_PREFIX)) {
+					total++;
+				}
+			}
+		} catch (error) {
+			return { total, completed };
+		}
+
+		return { total, completed };
 	}
 
 	getDayOfWeek(weekMoment: moment.Moment, dayNum: number): Date {
 		// dayNum: 1=Monday, 2=Tuesday, ..., 7=Sunday
-		const startOfWeek = weekMoment.clone().startOf('isoWeek');
-		return startOfWeek.add(dayNum - 1, 'days').toDate();
+		const startOfWeek = weekMoment.clone().startOf("isoWeek");
+		return startOfWeek.add(dayNum - 1, "days").toDate();
 	}
 
 	isWorkingDay(date: Date): boolean {
-		const weekdays = this.settings.workingDays.split(',');
-		const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+		const weekdays = this.settings.workingDays.split(",");
+		const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 		const dayName = dayNames[date.getDay()];
 		return weekdays.includes(dayName);
 	}
 
-	async addTaskToDay(date: Date, taskText: string, weekFileName: string, shift?: string) {
+	async addTaskToDay(
+		date: Date,
+		taskText: string,
+		weekFileName: string,
+		shift?: string
+	) {
 		const dayFileName = getDayFileName(this.settings, date);
-		const dayFile = new WeekPlannerFile(this.settings, this.app.vault, dayFileName);
-		const weekLink = `[[${weekFileName.replace('.md', '').split('/').pop()}]]`;
-		
+		const dayFile = new WeekPlannerFile(
+			this.settings,
+			this.app.vault,
+			dayFileName
+		);
+		const weekLink = `[[${weekFileName
+			.replace(".md", "")
+			.split("/")
+			.pop()}]]`;
+
 		// Create day file if it doesn't exist with week link
-		let content = '';
+		let content = "";
 		try {
 			content = await this.app.vault.adapter.read(dayFileName);
 		} catch (error) {
@@ -967,86 +1704,116 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			await this.app.vault.adapter.write(dayFileName, header);
 			content = header;
 		}
-		
+
 		// Check if task already exists
 		const taskExists = content.includes(taskText);
-		
+
 		if (!taskExists) {
 			// Add week link if not present
 			if (!content.includes(weekLink)) {
-				const lines = content.split('\n');
-				const headerIndex = lines.findIndex(line => line.trim().startsWith('##'));
+				const lines = content.split("\n");
+				const headerIndex = lines.findIndex((line) =>
+					line.trim().startsWith("##")
+				);
 				if (headerIndex !== -1) {
-					lines.splice(headerIndex + 1, 0, '', `Week: ${weekLink}`, '', '');
-					content = lines.join('\n');
+					lines.splice(
+						headerIndex + 1,
+						0,
+						"",
+						`Week: ${weekLink}`,
+						"",
+						""
+					);
+					content = lines.join("\n");
 					await this.app.vault.adapter.write(dayFileName, content);
 				}
 			}
-			
+
 			// Add task with or without shift section
 			if (shift) {
 				await this.addTaskToShiftSection(dayFileName, taskText, shift);
 			} else {
 				// Add task without shift section - append at end
-				const updatedContent = await this.app.vault.adapter.read(dayFileName);
+				const updatedContent = await this.app.vault.adapter.read(
+					dayFileName
+				);
 				const task = `${TODO_PREFIX}${taskText}`;
-				await this.app.vault.adapter.write(dayFileName, updatedContent.trimEnd() + '\n' + task + '\n');
+				await this.app.vault.adapter.write(
+					dayFileName,
+					updatedContent.trimEnd() + "\n" + task + "\n"
+				);
 			}
 		}
 	}
 
-	async addTaskToShiftSection(dayFileName: string, taskText: string, shift: string) {
+	async addTaskToShiftSection(
+		dayFileName: string,
+		taskText: string,
+		shift: string
+	) {
 		const content = await this.app.vault.adapter.read(dayFileName);
-		const lines = content.split('\n');
-		
+		const lines = content.split("\n");
+
 		// Shift headers - only Morning, Afternoon, and Night
-		const shiftHeaders: {[key: string]: string} = {
-			'morning': '### Morning',
-			'afternoon': '### Afternoon',
-			'night': '### Night'
+		const shiftHeaders: { [key: string]: string } = {
+			morning: "### Morning",
+			afternoon: "### Afternoon",
+			night: "### Night",
 		};
-		
+
 		const shiftHeader = shiftHeaders[shift];
 		if (!shiftHeader) return;
-		
+
 		// Find shift section
-		const shiftIndex = lines.findIndex(line => line.trim() === shiftHeader);
-		
+		const shiftIndex = lines.findIndex(
+			(line) => line.trim() === shiftHeader
+		);
+
 		if (shiftIndex !== -1) {
 			// Shift section exists, add task after it
 			const task = `${TODO_PREFIX}${taskText}`;
 			lines.splice(shiftIndex + 1, 0, task);
 		} else {
 			// Create shift section in the correct order: Morning -> Afternoon -> Night
-			const shiftOrder = ['morning', 'afternoon', 'night'];
+			const shiftOrder = ["morning", "afternoon", "night"];
 			const currentShiftIndex = shiftOrder.indexOf(shift);
-			
+
 			// Find where to insert the new section
 			let insertIndex = -1;
 			for (let i = currentShiftIndex + 1; i < shiftOrder.length; i++) {
 				const nextShift = shiftHeaders[shiftOrder[i]];
-				const nextIndex = lines.findIndex(line => line.trim() === nextShift);
+				const nextIndex = lines.findIndex(
+					(line) => line.trim() === nextShift
+				);
 				if (nextIndex !== -1) {
 					insertIndex = nextIndex;
 					break;
 				}
 			}
-			
+
 			if (insertIndex === -1) {
 				// No later shift found, add at the end
-				lines.push('', shiftHeader, `${TODO_PREFIX}${taskText}`);
+				lines.push("", shiftHeader, `${TODO_PREFIX}${taskText}`);
 			} else {
 				// Insert before the next shift with separator
-				lines.splice(insertIndex, 0, shiftHeader, `${TODO_PREFIX}${taskText}`, '', '---', '');
+				lines.splice(
+					insertIndex,
+					0,
+					shiftHeader,
+					`${TODO_PREFIX}${taskText}`,
+					"",
+					"---",
+					""
+				);
 			}
 		}
-		
+
 		// Add separators between existing shifts if not present
 		const updatedLines = [];
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
 			updatedLines.push(line);
-			
+
 			// Check if this is a shift header and the next shift header exists without separator
 			if (Object.values(shiftHeaders).includes(line.trim())) {
 				// Find the next shift header
@@ -1057,43 +1824,46 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 						break;
 					}
 				}
-				
+
 				// If next shift found, check if separator exists
 				if (nextShiftIndex !== -1) {
 					let hasSeparator = false;
 					for (let k = i + 1; k < nextShiftIndex; k++) {
-						if (lines[k].trim() === '---') {
+						if (lines[k].trim() === "---") {
 							hasSeparator = true;
 							break;
 						}
 					}
-					
+
 					// Skip to just before next shift
 					while (i + 1 < nextShiftIndex) {
 						i++;
 						updatedLines.push(lines[i]);
 					}
-					
+
 					if (!hasSeparator) {
-						updatedLines.push('');
-						updatedLines.push('---');
-						updatedLines.push('');
+						updatedLines.push("");
+						updatedLines.push("---");
+						updatedLines.push("");
 					}
 				}
 			}
 		}
-		
+
 		lines.splice(0, lines.length, ...updatedLines);
-		
+
 		// Write back to file
-		await this.app.vault.adapter.write(dayFileName, lines.join('\n'));
+		await this.app.vault.adapter.write(dayFileName, lines.join("\n"));
 	}
 
-	onunload() {
-	}
+	onunload() {}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData()
+		);
 	}
 
 	async saveSettings() {
@@ -1110,68 +1880,95 @@ class WeekPlannerSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings forWeek Planner plugin.'});
-
-		new Setting(containerEl)
-			.setName('Working Days')
-			.setDesc('Weekdays that should be considered when stepping between days or shifting tasks to the next working day. Format: Mon,Tue,Wed,Thu,Fri,Sat,Sun')
-			.addText(text => text
-				.setPlaceholder('Mon,Tue,Wed,Thu,Fri')
-				.setValue(this.plugin.settings.workingDays)
-				.onChange(async (value) => {
-					value = validateOrDefault(value)
-					this.plugin.settings.workingDays = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Base directory')
-			.setDesc("Week planner's root directory. Will be created if if doesn't exists.")
-			.addText(text => text
-				.setPlaceholder('Week Planner')
-				.setValue(this.plugin.settings.baseDir)
-				.onChange(async (value) => {
-					value = validateDirectoryOrDefault(value, DEFAULT_SETTINGS.baseDir).trim()
-					this.plugin.settings.baseDir = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Days directory')
-			.setDesc("Subdirectory of base where daily todo files are stored. Will be created if if doesn't exists.")
-			.addText(text => text
-				.setPlaceholder('Days')
-				.setValue(this.plugin.settings.daysDir)
-				.onChange(async (value) => {
-					value = validateDirectoryOrDefault(value, DEFAULT_SETTINGS.daysDir).trim()
-					this.plugin.settings.daysDir = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Weeks directory')
-			.setDesc("Subdirectory of base where weekly files are stored. Will be created if if doesn't exists.")
-			.addText(text => text
-				.setPlaceholder('Weeks')
-				.setValue(this.plugin.settings.weeksDir)
-				.onChange(async (value) => {
-					value = validateDirectoryOrDefault(value, DEFAULT_SETTINGS.weeksDir).trim()
-					this.plugin.settings.weeksDir = value;
-					await this.plugin.saveSettings();
-				}));
-
-		const div = containerEl.createEl('div', {
-			cls: 'advanced-tables-donation',
+		containerEl.createEl("h2", {
+			text: "Settings forWeek Planner plugin.",
 		});
 
-		const donateText = document.createElement('p');
+		new Setting(containerEl)
+			.setName("Working Days")
+			.setDesc(
+				"Weekdays that should be considered when stepping between days or shifting tasks to the next working day. Format: Mon,Tue,Wed,Thu,Fri,Sat,Sun"
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Mon,Tue,Wed,Thu,Fri")
+					.setValue(this.plugin.settings.workingDays)
+					.onChange(async (value) => {
+						value = validateOrDefault(value);
+						this.plugin.settings.workingDays = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Base directory")
+			.setDesc(
+				"Week planner's root directory. Will be created if if doesn't exists."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Week Planner")
+					.setValue(this.plugin.settings.baseDir)
+					.onChange(async (value) => {
+						value = validateDirectoryOrDefault(
+							value,
+							DEFAULT_SETTINGS.baseDir
+						).trim();
+						this.plugin.settings.baseDir = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Days directory")
+			.setDesc(
+				"Subdirectory of base where daily todo files are stored. Will be created if if doesn't exists."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Days")
+					.setValue(this.plugin.settings.daysDir)
+					.onChange(async (value) => {
+						value = validateDirectoryOrDefault(
+							value,
+							DEFAULT_SETTINGS.daysDir
+						).trim();
+						this.plugin.settings.daysDir = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Weeks directory")
+			.setDesc(
+				"Subdirectory of base where weekly files are stored. Will be created if if doesn't exists."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Weeks")
+					.setValue(this.plugin.settings.weeksDir)
+					.onChange(async (value) => {
+						value = validateDirectoryOrDefault(
+							value,
+							DEFAULT_SETTINGS.weeksDir
+						).trim();
+						this.plugin.settings.weeksDir = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		const div = containerEl.createEl("div", {
+			cls: "advanced-tables-donation",
+		});
+
+		const donateText = document.createElement("p");
 		donateText.appendText(
-			'If this plugin adds value for you and you would like to help support ' +
-			'continued development, please use the button below:',
+			"If this plugin adds value for you and you would like to help support " +
+				"continued development, please use the button below:"
 		);
 		div.appendChild(donateText);
 
@@ -1179,41 +1976,41 @@ class WeekPlannerSettingTab extends PluginSettingTab {
 
 		div.appendChild(
 			createDonateButton(
-				'https://paypal.me/ralfwirdemann',
-				parser.parseFromString(paypal, 'text/xml').documentElement,
-			),
+				"https://paypal.me/ralfwirdemann",
+				parser.parseFromString(paypal, "text/xml").documentElement
+			)
 		);
 	}
 }
 
 function validateOrDefault(value: string) {
 	if (isValidWorkingDaysString(value)) {
-		console.log('working day string is valid')
-		return value
+		console.log("working day string is valid");
+		return value;
 	}
 
-	console.log('working day string is invalid. using default')
-	return DEFAULT_SETTINGS.workingDays
+	console.log("working day string is invalid. using default");
+	return DEFAULT_SETTINGS.workingDays;
 }
 
 function validateDirectoryOrDefault(value: string, defaultValue: string) {
-	if (value === undefined || value === '') {
-		console.log('directory is invalid. using default')
-		return defaultValue
+	if (value === undefined || value === "") {
+		console.log("directory is invalid. using default");
+		return defaultValue;
 	}
 
-	if (value.contains(':') || value.contains('/') || value.contains('\\')) {
-		console.log('directory contains invalid character')
-		return defaultValue
+	if (value.contains(":") || value.contains("/") || value.contains("\\")) {
+		console.log("directory contains invalid character");
+		return defaultValue;
 	}
 
-	return value
+	return value;
 }
 
 const createDonateButton = (link: string, img: HTMLElement): HTMLElement => {
-	const a = document.createElement('a');
-	a.setAttribute('href', link);
-	a.addClass('advanced-tables-donate-button');
+	const a = document.createElement("a");
+	a.setAttribute("href", link);
+	a.addClass("advanced-tables-donate-button");
 	a.appendChild(img);
 	return a;
 };
