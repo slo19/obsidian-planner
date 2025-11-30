@@ -6,6 +6,8 @@ import {
 	Setting,
 	moment,
 	Notice,
+	normalizePath,
+	TFile,
 } from "obsidian";
 import WeekPlannerFile, {
 	extendFileName,
@@ -23,9 +25,16 @@ import { getCalendarWeek } from "./src/date";
 import { TodoModal } from "./src/todo-modal";
 import { DEFAULT_SETTINGS, WeekPlannerPluginSettings } from "./src/settings";
 
+type DailyNoteOptions = {
+	folder: string;
+	template: string;
+	format: string;
+};
+
 // noinspection JSUnusedGlobalSymbols
 export default class WeekPlannerPlugin extends Plugin {
 	settings: WeekPlannerPluginSettings;
+	dailyLinkCache: Map<string, string> = new Map();
 
 	async onload() {
 		await this.loadSettings();
@@ -365,9 +374,11 @@ export default class WeekPlannerPlugin extends Plugin {
 	async syncWeekToDays() {
 		const m = moment();
 		const weekFileName = getWeekFileName(this.settings, m);
+		this.dailyLinkCache.clear();
 
 		try {
 			const weekContent = await this.app.vault.adapter.read(weekFileName);
+			await this.ensureDailyNotesForWeek(m);
 
 			// First, remove tasks from days that are no longer in week
 			await this.removeDeletedTasksFromDays(weekContent, m, weekFileName);
@@ -1663,6 +1674,198 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		return { total, completed };
 	}
 
+	async ensureDailyNotesForWeek(weekMoment: moment.Moment) {
+		for (let i = 1; i <= 7; i++) {
+			const dayDate = this.getDayOfWeek(weekMoment, i);
+			await this.ensureDailyNoteForDate(dayDate);
+		}
+	}
+
+	async ensureDailyNoteForDate(date: Date): Promise<string | null> {
+		const key = moment(date).format("YYYY-MM-DD");
+		if (this.dailyLinkCache.has(key)) {
+			return this.dailyLinkCache.get(key)!;
+		}
+
+		const options = this.getDailyNotesOptions();
+		const fallbackLink = `[[${key}]]`;
+		if (!options) {
+			this.dailyLinkCache.set(key, fallbackLink);
+			return fallbackLink;
+		}
+
+		const dailyPath = this.getDailyNotePath(date, options);
+		if (!dailyPath) {
+			this.dailyLinkCache.set(key, fallbackLink);
+			return fallbackLink;
+		}
+
+		try {
+			await this.ensureFolderExists(options.folder);
+			const normalizedPath = normalizePath(dailyPath);
+			let file = this.app.vault.getAbstractFileByPath(
+				normalizedPath
+			) as TFile | null;
+			if (!file) {
+				const templateContent = await this.getDailyTemplateContent(
+					options.template
+				);
+				file = await this.app.vault.create(
+					normalizedPath,
+					templateContent ?? ""
+				);
+			}
+			const link = this.buildDailyLinkFromPath(normalizedPath);
+			this.dailyLinkCache.set(key, link);
+			return link;
+		} catch (error) {
+			console.error("Error ensuring daily note:", error);
+			this.dailyLinkCache.set(key, fallbackLink);
+			return fallbackLink;
+		}
+	}
+
+	async ensureDayMetadata(
+		dayFileName: string,
+		content: string,
+		weekLink: string,
+		dailyLink?: string
+	): Promise<string> {
+		const lines = content.split("\n");
+		let modified = false;
+		const headerIndex = lines.findIndex((line) =>
+			line.trim().startsWith("##")
+		);
+
+		const ensureLine = (
+			label: string,
+			value: string,
+			afterLabel?: string
+		) => {
+			const desired = `${label}: ${value}`;
+			const existingIndex = lines.findIndex((line) =>
+				line.trim().startsWith(`${label}:`)
+			);
+			if (existingIndex !== -1) {
+				if (lines[existingIndex].trim() !== desired) {
+					lines[existingIndex] = desired;
+					modified = true;
+				}
+				return existingIndex;
+			}
+
+			let insertPos = headerIndex !== -1 ? headerIndex + 1 : 0;
+			if (afterLabel) {
+				const afterIndex = lines.findIndex((line) =>
+					line.trim().startsWith(`${afterLabel}:`)
+				);
+				if (afterIndex !== -1) {
+					insertPos = afterIndex + 1;
+				}
+			}
+
+			if (insertPos > lines.length) {
+				insertPos = lines.length;
+			}
+
+			if (lines[insertPos] && lines[insertPos].trim() !== "") {
+				lines.splice(insertPos, 0, "");
+				insertPos++;
+			}
+
+			lines.splice(insertPos, 0, desired);
+			lines.splice(insertPos + 1, 0, "");
+			modified = true;
+			return insertPos;
+		};
+
+		ensureLine("Week", weekLink);
+		if (dailyLink) {
+			ensureLine("Daily", dailyLink, "Week");
+		}
+
+		if (modified) {
+			const updated = lines.join("\n");
+			await this.app.vault.adapter.write(dayFileName, updated);
+			return updated;
+		}
+		return content;
+	}
+
+	getDailyNotesOptions(): DailyNoteOptions | null {
+		const internalPlugins: any = (this.app as any).internalPlugins;
+		if (!internalPlugins) {
+			return null;
+		}
+		const plugin = internalPlugins.getPluginById
+			? internalPlugins.getPluginById("daily-notes")
+			: internalPlugins.plugins?.["daily-notes"];
+		if (!plugin || plugin.enabled === false) {
+			return null;
+		}
+		const options = plugin.instance?.options ?? plugin.options;
+		if (!options) {
+			return null;
+		}
+		return {
+			folder: options.folder?.trim() ?? "",
+			template: options.template?.trim() ?? "",
+			format: options.format?.trim() ?? "YYYY-MM-DD",
+		};
+	}
+
+	getDailyNotePath(date: Date, options: DailyNoteOptions): string {
+		const format = options.format || "YYYY-MM-DD";
+		const fileName = moment(date).format(format);
+		const folder = options.folder ? normalizePath(options.folder) : "";
+		return folder ? `${folder}/${fileName}.md` : `${fileName}.md`;
+	}
+
+	buildDailyLinkFromPath(path: string): string {
+		const withoutExt = path.replace(/\.md$/i, "");
+		return `[[${withoutExt}]]`;
+	}
+
+	async getDailyTemplateContent(
+		templatePath: string
+	): Promise<string | null> {
+		if (!templatePath) {
+			return null;
+		}
+		const normalized = normalizePath(templatePath);
+		let file = this.app.vault.getAbstractFileByPath(normalized);
+		if (!file) {
+			file = this.app.metadataCache.getFirstLinkpathDest(
+				templatePath,
+				""
+			) as TFile | null;
+		}
+		if (file && file instanceof TFile) {
+			return await this.app.vault.read(file);
+		}
+		return null;
+	}
+
+	async ensureFolderExists(folderPath: string) {
+		if (!folderPath) {
+			return;
+		}
+		const normalized = normalizePath(folderPath);
+		try {
+			const exists = await this.app.vault.adapter.exists(normalized);
+			if (!exists) {
+				await this.app.vault.createFolder(normalized);
+			}
+		} catch (error) {
+			if (
+				!(error instanceof Error) ||
+				!error.message.includes("exists")
+			) {
+				console.error("Error ensuring folder exists:", error);
+			}
+		}
+	}
+
 	getDayOfWeek(weekMoment: moment.Moment, dayNum: number): Date {
 		// dayNum: 1=Monday, 2=Tuesday, ..., 7=Sunday
 		const startOfWeek = weekMoment.clone().startOf("isoWeek");
@@ -1692,6 +1895,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			.replace(".md", "")
 			.split("/")
 			.pop()}]]`;
+		const dailyLink = await this.ensureDailyNoteForDate(date);
 
 		// Create day file if it doesn't exist with week link
 		let content = "";
@@ -1700,10 +1904,21 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		} catch (error) {
 			// File doesn't exist, create it with proper structure
 			const dayDate = moment(date);
-			const header = `## Tasks\n\nWeek: ${weekLink}\n\n`;
+			const headerParts = ["## Tasks", "", `Week: ${weekLink}`];
+			if (dailyLink) {
+				headerParts.push(`Daily: ${dailyLink}`);
+			}
+			headerParts.push("", "");
+			const header = headerParts.join("\n");
 			await this.app.vault.adapter.write(dayFileName, header);
 			content = header;
 		}
+		content = await this.ensureDayMetadata(
+			dayFileName,
+			content,
+			weekLink,
+			dailyLink || undefined
+		);
 
 		// Check if task already exists
 		const taskExists = content.includes(taskText);
