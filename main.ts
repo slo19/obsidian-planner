@@ -23,12 +23,30 @@ import WeekPlannerFile, {
 import { TODO_DONE_PREFIX, TODO_PREFIX } from "./src/constants";
 import { getCalendarWeek } from "./src/date";
 import { TodoModal } from "./src/todo-modal";
-import { DEFAULT_SETTINGS, WeekPlannerPluginSettings } from "./src/settings";
+import {
+	DEFAULT_SETTINGS,
+	HabitRecord,
+	WeekPlannerPluginSettings,
+} from "./src/settings";
+
+const HABIT_TAG_REGEX = /#(?:sym:)?habit\b/gi;
+const HABIT_TAG_TEST_REGEX = /#(?:sym:)?habit\b/i;
+const SHIFT_TAGS_REGEX = /#(morning|afternoon|night)\b/gi;
 
 type DailyNoteOptions = {
 	folder: string;
 	template: string;
 	format: string;
+};
+
+type HabitStreakInfo = {
+	record: HabitRecord;
+	currentStreak: number;
+	longestStreak: number;
+	totalCompletions: number;
+	progressPercent: number;
+	todayDone: boolean;
+	daysRemaining: number;
 };
 
 // noinspection JSUnusedGlobalSymbols
@@ -434,7 +452,7 @@ export default class WeekPlannerPlugin extends Plugin {
 					.trim();
 				const taskName = this.extractTaskName(taskText);
 				if (taskName) {
-					weekTasks.add(taskName);
+					weekTasks.add(this.normalizeTaskForDayStorage(taskName));
 				}
 			}
 		}
@@ -461,8 +479,10 @@ export default class WeekPlannerPlugin extends Plugin {
 							.replace(TODO_PREFIX, "")
 							.replace(TODO_DONE_PREFIX, "")
 							.trim();
+						const normalizedTask =
+							this.normalizeTaskForDayStorage(taskText);
 						// Keep task if it's in the week file
-						if (weekTasks.has(taskText)) {
+						if (weekTasks.has(normalizedTask)) {
 							newLines.push(line);
 						}
 						// Otherwise, skip it (delete it)
@@ -747,6 +767,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			string,
 			{ completed: number; total: number }
 		> = new Map();
+		const activeHabitIds: Set<string> = new Set();
 
 		let totalTasks = 0;
 		let completedTasks = 0;
@@ -768,6 +789,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					if (line.trim().startsWith(TODO_PREFIX)) {
 						totalTasks++;
 						dayTotal++;
+						this.collectHabitIdFromLine(line, activeHabitIds);
 
 						// Track task attendance
 						const taskName = line
@@ -787,6 +809,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 						completedTasks++;
 						dayTotal++;
 						dayCompleted++;
+						this.collectHabitIdFromLine(line, activeHabitIds);
 
 						// Track task attendance
 						const taskName = line
@@ -910,6 +933,12 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			progressReport.push("</div>");
 		}
 
+		const habitSection = await this.buildHabitSection(activeHabitIds);
+		if (habitSection.length > 0) {
+			progressReport.push("");
+			progressReport.push(...habitSection);
+		}
+
 		// Remove old progress section if exists
 		const progressStartIndex = lines.findIndex(
 			(line) =>
@@ -994,6 +1023,9 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					const taskName = maskMatch[2].trim();
 					const shift = maskMatch[3]?.toLowerCase();
 					const days = this.parseDayMask(mask);
+					if (this.isHabitTask(taskName)) {
+						await this.ensureHabitRegistered(taskName);
+					}
 
 					if (days.length > 0) {
 						for (const dayNum of days) {
@@ -1020,6 +1052,9 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					const shift = shiftDayMatch[2].toLowerCase();
 					const daysStr = shiftDayMatch[3];
 					const days = this.parseDays(daysStr);
+					if (this.isHabitTask(taskName)) {
+						await this.ensureHabitRegistered(taskName);
+					}
 
 					if (days.length > 0) {
 						for (const dayNum of days) {
@@ -1046,6 +1081,9 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					// Task with shift for all working days: "exercícios - #morning"
 					const taskName = shiftOnlyMatch[1].trim();
 					const shift = shiftOnlyMatch[2].toLowerCase();
+					if (this.isHabitTask(taskName)) {
+						await this.ensureHabitRegistered(taskName);
+					}
 
 					for (let i = 1; i <= 7; i++) {
 						const dayDate = this.getDayOfWeek(weekMoment, i);
@@ -1064,6 +1102,9 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					const taskName = dayOnlyMatch[1].trim();
 					const daysStr = dayOnlyMatch[2];
 					const days = this.parseDays(daysStr);
+					if (this.isHabitTask(taskName)) {
+						await this.ensureHabitRegistered(taskName);
+					}
 
 					if (days.length > 0) {
 						for (const dayNum of days) {
@@ -1087,6 +1128,9 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 					}
 				} else if (noPatternMatch) {
 					// Task for all working days without shift: "fazer relatório"
+					if (this.isHabitTask(taskText)) {
+						await this.ensureHabitRegistered(taskText);
+					}
 					for (let i = 1; i <= 7; i++) {
 						const dayDate = this.getDayOfWeek(weekMoment, i);
 						if (this.isWorkingDay(dayDate)) {
@@ -1403,6 +1447,12 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			}
 			lines.push(...analyticsSection);
 
+			const habitCards = await this.generateHabitSummaryCards();
+			if (habitCards.length > 0) {
+				lines.push("");
+				lines.push(...habitCards);
+			}
+
 			await this.app.vault.adapter.write(
 				summaryFileName,
 				lines.join("\n")
@@ -1674,6 +1724,332 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		return { total, completed };
 	}
 
+	async buildHabitSection(activeHabitIds?: Set<string>): Promise<string[]> {
+		const habitStats = await this.calculateHabitStreaks();
+		const filteredStats =
+			activeHabitIds && activeHabitIds.size === 0
+				? []
+				: activeHabitIds && activeHabitIds.size > 0
+				? habitStats.filter((stat) =>
+						activeHabitIds.has(stat.record.id)
+				  )
+				: habitStats;
+		if (filteredStats.length === 0) {
+			return [];
+		}
+
+		const target =
+			this.settings.habitTargetDays || DEFAULT_SETTINGS.habitTargetDays;
+		const lines: string[] = [
+			"### 🔁 Habit Streaks",
+			`*Meta padrão: ${target} dia(s) consecutivos*`,
+			"",
+			'<div style="display: grid; gap: 12px; margin: 15px 0;">',
+		];
+
+		for (const stat of filteredStats) {
+			lines.push(
+				'<div style="background: white; padding: 14px; border-radius: 10px; border-left: 4px solid #0ea5e9; box-shadow: 0 2px 6px rgba(15,23,42,0.12);">'
+			);
+			lines.push(
+				`<div style="font-weight: 600; color: #0f172a; margin-bottom: 4px;">${stat.record.name}</div>`
+			);
+			lines.push(
+				`<div style="font-size: 13px; color: #475569; margin-bottom: 6px;">Streak atual: ${stat.currentStreak} dia(s) • Melhor: ${stat.longestStreak} dia(s)</div>`
+			);
+			lines.push(
+				`<div style="font-size: 12px; color: #475569; margin-bottom: 6px;">Progresso: ${stat.totalCompletions}/${stat.record.targetDays} (${stat.daysRemaining} restante(s))</div>`
+			);
+			lines.push(
+				`<div style="font-size: 12px; color: ${
+					stat.todayDone ? "#16a34a" : "#dc2626"
+				}; margin-bottom: 6px;">Hoje: ${
+					stat.todayDone ? "✅ Concluído" : "⬜ Pendiente"
+				}</div>`
+			);
+			lines.push(this.generateProgressBar(stat.progressPercent));
+			lines.push("</div>");
+		}
+
+		lines.push("</div>");
+		return lines;
+	}
+
+	async generateHabitSummaryCards(): Promise<string[]> {
+		const habitStats = await this.calculateHabitStreaks();
+		if (habitStats.length === 0) {
+			return [];
+		}
+
+		const lines: string[] = [
+			"## 🔁 Habit Streaks",
+			"",
+			'<div style="display: flex; flex-wrap: wrap; gap: 16px;">',
+		];
+
+		for (const stat of habitStats) {
+			lines.push(
+				'<div style="flex: 1 1 220px; background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); color: white; padding: 16px; border-radius: 12px; box-shadow: 0 8px 20px rgba(37,99,235,0.35);">'
+			);
+			lines.push(
+				`<div style="font-size: 15px; font-weight: 600; margin-bottom: 8px;">${stat.record.name}</div>`
+			);
+			lines.push(
+				`<div style="font-size: 13px; opacity: 0.9;">Atual: ${stat.currentStreak}d • Melhor: ${stat.longestStreak}d</div>`
+			);
+			lines.push(
+				`<div style="font-size: 13px; opacity: 0.9;">${stat.totalCompletions}/${stat.record.targetDays} dias (${stat.progressPercent}%)</div>`
+			);
+			lines.push(
+				`<div style="font-size: 12px; margin-top: 8px;">Hoje: ${
+					stat.todayDone ? "✅" : "⬜"
+				}</div>`
+			);
+			lines.push("</div>");
+		}
+
+		lines.push("</div>");
+		return lines;
+	}
+
+	async calculateHabitStreaks(): Promise<HabitStreakInfo[]> {
+		const habits = this.settings.habits ?? [];
+		if (habits.length === 0) {
+			return [];
+		}
+
+		const today = moment().startOf("day");
+		const cache = new Map<string, Map<string, boolean>>();
+		const results: HabitStreakInfo[] = [];
+
+		for (const habit of habits) {
+			const start = moment(habit.startedOn, "YYYY-MM-DD", true);
+			if (!start.isValid() || start.isAfter(today, "day")) {
+				continue;
+			}
+
+			const target =
+				habit.targetDays ||
+				this.settings.habitTargetDays ||
+				DEFAULT_SETTINGS.habitTargetDays;
+			let runningStreak = 0;
+			let longestStreak = 0;
+			let totalCompletions = 0;
+			let todayDone = false;
+			const cursor = start.clone();
+
+			while (cursor.isSameOrBefore(today, "day")) {
+				const dayStatus = await this.getHabitDayStatus(cursor, cache);
+				const done = dayStatus.get(habit.id) === true;
+				if (done) {
+					totalCompletions++;
+					runningStreak++;
+					if (runningStreak > longestStreak) {
+						longestStreak = runningStreak;
+					}
+				} else {
+					runningStreak = 0;
+				}
+
+				if (cursor.isSame(today, "day")) {
+					todayDone = done;
+				}
+
+				cursor.add(1, "day");
+			}
+
+			const progressPercent =
+				target > 0
+					? Math.min(
+							100,
+							Math.round((totalCompletions / target) * 100)
+					  )
+					: 0;
+			const daysRemaining = Math.max(0, target - totalCompletions);
+			const currentStreak = runningStreak;
+
+			results.push({
+				record: habit,
+				currentStreak,
+				longestStreak,
+				totalCompletions,
+				progressPercent,
+				todayDone,
+				daysRemaining,
+			});
+		}
+
+		return results.sort((a, b) => {
+			if (a.daysRemaining === b.daysRemaining) {
+				return b.currentStreak - a.currentStreak;
+			}
+			return a.daysRemaining - b.daysRemaining;
+		});
+	}
+
+	async getHabitDayStatus(
+		date: moment.Moment,
+		cache: Map<string, Map<string, boolean>>
+	): Promise<Map<string, boolean>> {
+		const key = date.format("YYYY-MM-DD");
+		if (cache.has(key)) {
+			return cache.get(key)!;
+		}
+
+		const statusMap = new Map<string, boolean>();
+		const dayFileName = getDayFileName(this.settings, date.toDate());
+		try {
+			const content = await this.app.vault.adapter.read(dayFileName);
+			const lines = content.split("\n");
+			for (const rawLine of lines) {
+				const trimmed = rawLine.trim();
+				const lower = trimmed.toLowerCase();
+				const isDone = lower.startsWith(TODO_DONE_PREFIX);
+				const isTodo = isDone || lower.startsWith(TODO_PREFIX);
+				if (!isTodo) {
+					continue;
+				}
+				if (!this.hasHabitTag(trimmed)) {
+					continue;
+				}
+				const prefixLength = isDone
+					? TODO_DONE_PREFIX.length
+					: TODO_PREFIX.length;
+				const rawTaskText = trimmed.slice(prefixLength);
+				const habitId = this.normalizeHabitIdentifier(rawTaskText);
+				if (!habitId) {
+					continue;
+				}
+				if (!statusMap.has(habitId) || isDone) {
+					statusMap.set(habitId, isDone);
+				}
+			}
+		} catch (error) {
+			// Missing file is treated as no data
+		}
+
+		cache.set(key, statusMap);
+		return statusMap;
+	}
+
+	isHabitTask(taskText: string): boolean {
+		return this.hasHabitTag(taskText);
+	}
+
+	getHabitDisplayName(taskText: string): string {
+		return this.stripHabitTag(taskText);
+	}
+
+	stripHabitTag(text: string): string {
+		return this.simplifyWikiLinks(text)
+			.replace(HABIT_TAG_REGEX, "")
+			.replace(/\s{2,}/g, " ")
+			.trim();
+	}
+
+	hasHabitTag(text: string): boolean {
+		return HABIT_TAG_TEST_REGEX.test(text);
+	}
+
+	normalizeTaskForDayStorage(taskText: string): string {
+		if (!taskText) {
+			return "";
+		}
+		let normalized = taskText.replace(
+			/\s*-\s*#(morning|afternoon|night)\b/gi,
+			""
+		);
+		normalized = normalized.replace(SHIFT_TAGS_REGEX, "");
+		normalized = normalized.replace(/\s{2,}/g, " ");
+		normalized = normalized.replace(/\s-\s+/g, " - ");
+		normalized = normalized.replace(/\s-\s*$/g, "");
+		return normalized.trim();
+	}
+
+	doesDayContentContainTask(
+		content: string,
+		normalizedTask: string
+	): boolean {
+		if (!normalizedTask) {
+			return false;
+		}
+		const lines = content.split("\n");
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (
+				trimmed.startsWith(TODO_PREFIX) ||
+				trimmed.startsWith(TODO_DONE_PREFIX)
+			) {
+				let taskBody = trimmed;
+				if (trimmed.startsWith(TODO_PREFIX)) {
+					taskBody = trimmed.slice(TODO_PREFIX.length);
+				} else if (trimmed.startsWith(TODO_DONE_PREFIX)) {
+					taskBody = trimmed.slice(TODO_DONE_PREFIX.length);
+				}
+				if (
+					this.normalizeTaskForDayStorage(taskBody.trim()) ===
+					normalizedTask
+				) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	collectHabitIdFromLine(line: string, target: Set<string>) {
+		const trimmed = line.trim();
+		if (!this.hasHabitTag(trimmed)) {
+			return;
+		}
+		let taskBody = trimmed;
+		if (trimmed.startsWith(TODO_DONE_PREFIX)) {
+			taskBody = trimmed.slice(TODO_DONE_PREFIX.length);
+		} else if (trimmed.startsWith(TODO_PREFIX)) {
+			taskBody = trimmed.slice(TODO_PREFIX.length);
+		}
+		const habitId = this.normalizeHabitIdentifier(taskBody.trim());
+		if (habitId) {
+			target.add(habitId);
+		}
+	}
+
+	normalizeHabitIdentifier(text: string): string {
+		const simplified = this.stripHabitTag(text)
+			.replace(/[^A-Za-z0-9À-ÖØ-öø-ÿ\s]/g, " ")
+			.toLowerCase();
+		return simplified.replace(/\s+/g, " ").trim();
+	}
+
+	simplifyWikiLinks(text: string): string {
+		return text
+			.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+			.replace(/\[\[([^\]]+)\]\]/g, "$1");
+	}
+
+	async ensureHabitRegistered(taskText: string) {
+		const id = this.normalizeHabitIdentifier(taskText);
+		const displayName = this.getHabitDisplayName(taskText);
+		if (!id || !displayName) {
+			return;
+		}
+		const habits = this.settings.habits ?? [];
+		if (habits.some((habit) => habit.id === id)) {
+			return;
+		}
+		const startDate = moment().startOf("day").format("YYYY-MM-DD");
+		const target =
+			this.settings.habitTargetDays || DEFAULT_SETTINGS.habitTargetDays;
+		habits.push({
+			id,
+			name: displayName,
+			startedOn: startDate,
+			targetDays: target,
+		});
+		this.settings.habits = habits;
+		await this.saveSettings();
+	}
+
 	async ensureDailyNotesForWeek(weekMoment: moment.Moment) {
 		for (let i = 1; i <= 7; i++) {
 			const dayDate = this.getDayOfWeek(weekMoment, i);
@@ -1885,6 +2261,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		weekFileName: string,
 		shift?: string
 	) {
+		const normalizedTaskText = this.normalizeTaskForDayStorage(taskText);
 		const dayFileName = getDayFileName(this.settings, date);
 		const dayFile = new WeekPlannerFile(
 			this.settings,
@@ -1921,7 +2298,10 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		);
 
 		// Check if task already exists
-		const taskExists = content.includes(taskText);
+		const taskExists = this.doesDayContentContainTask(
+			content,
+			normalizedTaskText
+		);
 
 		if (!taskExists) {
 			// Add week link if not present
@@ -1946,13 +2326,17 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 
 			// Add task with or without shift section
 			if (shift) {
-				await this.addTaskToShiftSection(dayFileName, taskText, shift);
+				await this.addTaskToShiftSection(
+					dayFileName,
+					normalizedTaskText,
+					shift
+				);
 			} else {
 				// Add task without shift section - append at end
 				const updatedContent = await this.app.vault.adapter.read(
 					dayFileName
 				);
-				const task = `${TODO_PREFIX}${taskText}`;
+				const task = `${TODO_PREFIX}${normalizedTaskText}`;
 				await this.app.vault.adapter.write(
 					dayFileName,
 					updatedContent.trimEnd() + "\n" + task + "\n"
@@ -1966,6 +2350,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 		taskText: string,
 		shift: string
 	) {
+		const normalizedTaskText = this.normalizeTaskForDayStorage(taskText);
 		const content = await this.app.vault.adapter.read(dayFileName);
 		const lines = content.split("\n");
 
@@ -1986,7 +2371,7 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 
 		if (shiftIndex !== -1) {
 			// Shift section exists, add task after it
-			const task = `${TODO_PREFIX}${taskText}`;
+			const task = `${TODO_PREFIX}${normalizedTaskText}`;
 			lines.splice(shiftIndex + 1, 0, task);
 		} else {
 			// Create shift section in the correct order: Morning -> Afternoon -> Night
@@ -2008,14 +2393,18 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 
 			if (insertIndex === -1) {
 				// No later shift found, add at the end
-				lines.push("", shiftHeader, `${TODO_PREFIX}${taskText}`);
+				lines.push(
+					"",
+					shiftHeader,
+					`${TODO_PREFIX}${normalizedTaskText}`
+				);
 			} else {
 				// Insert before the next shift with separator
 				lines.splice(
 					insertIndex,
 					0,
 					shiftHeader,
-					`${TODO_PREFIX}${taskText}`,
+					`${TODO_PREFIX}${normalizedTaskText}`,
 					"",
 					"---",
 					""
@@ -2079,6 +2468,15 @@ Success: ${(row.successRate * 100).toFixed(1)}%</title>`);
 			DEFAULT_SETTINGS,
 			await this.loadData()
 		);
+		if (!Array.isArray(this.settings.habits)) {
+			this.settings.habits = [];
+		}
+		if (
+			!this.settings.habitTargetDays ||
+			this.settings.habitTargetDays <= 0
+		) {
+			this.settings.habitTargetDays = DEFAULT_SETTINGS.habitTargetDays;
+		}
 	}
 
 	async saveSettings() {
@@ -2186,6 +2584,27 @@ class WeekPlannerSettingTab extends PluginSettingTab {
 				"continued development, please use the button below:"
 		);
 		div.appendChild(donateText);
+
+		new Setting(containerEl)
+			.setName("Habit streak length")
+			.setDesc(
+				"Número de dias consecutivos exigido para considerar um hábito completo (padrão 77)."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("77")
+					.setValue(
+						String(this.plugin.settings.habitTargetDays ?? 77)
+					)
+					.onChange(async (value) => {
+						const parsed = parseInt(value, 10);
+						this.plugin.settings.habitTargetDays =
+							!isNaN(parsed) && parsed > 0
+								? parsed
+								: DEFAULT_SETTINGS.habitTargetDays;
+						await this.plugin.saveSettings();
+					})
+			);
 
 		const parser = new DOMParser();
 

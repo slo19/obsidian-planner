@@ -89,6 +89,31 @@ command. Use the syntax below inside your week note:
 The mask format keeps partial selections stable across sync runs because each day is explicitly
 encoded in the seven-character pattern.
 
+## Daily Notes Integration
+
+-   O plugin conversa diretamente com o Daily Notes nativo do Obsidian. Ao rodar **Sync Week Tasks
+    to Days** ele garante que exista uma daily note para cada dia da semana planejada, usando a
+    pasta/template/format definidos nas configurações padrão do Obsidian.
+-   Cada arquivo diário gerado recebe automaticamente um link `Daily: [[YYYY-MM-DD]]` logo abaixo
+    do link da semana, facilitando a navegação cruzada entre planner e registro diário.
+
+Nenhuma configuração extra é necessária — basta manter o Daily Notes habilitado e apontando para a
+pasta desejada.
+
+## Habit Streak Challenges
+
+-   Acrescente `#habit` ao texto de qualquer tarefa semanal para transformá-la em um hábito.
+-   Cada hábito cria automaticamente um desafio de **77 dias consecutivos** (valor padrão
+    configurável nas settings) e passa a ser acompanhado diariamente.
+-   O progresso aparece em dois lugares:
+-   Na seção “Habit Streaks” do arquivo da semana, mostrando streak atual, melhor streak e
+    barra de progresso para a meta.
+-   No `Summary.md`, em cartões coloridos que exibem streak atual, melhor streak e status do dia.
+-   Pular um dia reinicia a sequência atual, ajudando a manter o foco na constância.
+
+Use o campo “Habit streak length” nas configurações do plugin para ajustar a quantidade de dias
+necessária para concluir cada hábito.
+
 ## Summary & Analytics
 
 Execute the `Update Weekly Summary` command to refresh `Summary.md` with layered insights:
